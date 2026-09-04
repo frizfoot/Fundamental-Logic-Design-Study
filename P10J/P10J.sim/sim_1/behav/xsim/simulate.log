@@ -1,0 +1,12 @@
+Time resolution is 1 ps
+PASS: 219 - 118 =  101 (c=01100101 bo=0)
+PASS: 118 - 219 = -101 (c=10011011 bo=1)
+PASS:  10 -   3 =    7 (c=00000111 bo=0)
+PASS:   3 -  10 =   -7 (c=11111001 bo=1)
+PASS:   0 -   0 =    0 (c=00000000 bo=0)
+PASS: 255 -   1 =   -2 (c=11111110 bo=0)
+PASS:   0 -   1 =   -1 (c=11111111 bo=1)
+PASS: 128 - 128 =    0 (c=00000000 bo=0)
+PASS: 127 - 128 =   -1 (c=11111111 bo=1)
+--- simulation finished ---
+$finish called at time : 90 ns : File "C:/Users/noelk/P10J/P10J.srcs/sim_1/new/simul.sv" Line 44

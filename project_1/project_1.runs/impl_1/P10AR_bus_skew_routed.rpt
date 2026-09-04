@@ -1,0 +1,16 @@
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2025 Advanced Micro Devices, Inc. All Rights Reserved.
+------------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2025.2 (win64) Build 6299465 Fri Nov 14 19:35:11 GMT 2025
+| Date         : Fri Aug 28 01:18:24 2026
+| Host         : M-Frizfoot running 64-bit major release  (build 9200)
+| Command      : report_bus_skew -warn_on_violation -file P10AR_bus_skew_routed.rpt -pb P10AR_bus_skew_routed.pb -rpx P10AR_bus_skew_routed.rpx
+| Design       : P10AR
+| Device       : 7k70t-fbv676
+| Speed File   : -1  PRODUCTION 1.12 2017-02-17
+| Design State : Routed
+------------------------------------------------------------------------------------------------------------------------------------------------
+
+Bus Skew Report
+
+No bus skew constraints
+

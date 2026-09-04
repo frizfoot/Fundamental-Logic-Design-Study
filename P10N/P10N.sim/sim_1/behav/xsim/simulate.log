@@ -1,0 +1,18 @@
+Time resolution is 1 ps
+PASS: y=10000000 e=1 -> abc=111 d=1
+PASS: y=01000000 e=1 -> abc=110 d=1
+PASS: y=00100000 e=1 -> abc=101 d=1
+PASS: y=00010000 e=1 -> abc=100 d=1
+PASS: y=00001000 e=1 -> abc=011 d=1
+PASS: y=00000100 e=1 -> abc=010 d=1
+PASS: y=00000010 e=1 -> abc=001 d=1
+PASS: y=00000001 e=1 -> abc=000 d=1
+PASS: y=11000000 e=1 -> abc=111 d=1
+PASS: y=10001000 e=1 -> abc=111 d=1
+PASS: y=00000110 e=1 -> abc=010 d=1
+PASS: y=11111111 e=1 -> abc=111 d=1
+PASS: y=00000000 e=1 -> abc=000 d=0
+PASS: y=11111111 e=0 -> abc=000 d=0
+PASS: y=10000000 e=0 -> abc=000 d=0
+--- simulation finished ---
+$finish called at time : 150 ns : File "C:/Users/noelk/P10N/P10N.srcs/sim_1/new/simul.sv" Line 55

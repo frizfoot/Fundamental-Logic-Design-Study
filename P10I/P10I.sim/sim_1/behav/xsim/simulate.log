@@ -1,0 +1,13 @@
+Time resolution is 1 ps
+t=0 y=00000001 -> abc=000 d=1
+t=10000 y=00000010 -> abc=001 d=1
+t=20000 y=00000100 -> abc=010 d=1
+t=30000 y=00001000 -> abc=011 d=1
+t=40000 y=00010000 -> abc=100 d=1
+t=50000 y=00100000 -> abc=101 d=1
+t=60000 y=01000000 -> abc=110 d=1
+t=70000 y=10000000 -> abc=111 d=1
+t=80000 y=11000010 -> abc=111 d=1
+t=90000 y=11111111 -> abc=111 d=1
+t=100000 y=00000000 -> abc=0xx d=0
+$finish called at time : 110 ns : File "C:/Users/noelk/P10I/P10I.srcs/sim_1/new/simul.sv" Line 45

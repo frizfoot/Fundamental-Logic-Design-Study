@@ -1,0 +1,24 @@
+#-----------------------------------------------------------
+# Vivado v2025.2 (64-bit)
+# SW Build 6299465 on Fri Nov 14 19:35:11 GMT 2025
+# IP Build 6300035 on Fri Nov 14 10:48:45 MST 2025
+# SharedData Build 6298862 on Thu Nov 13 04:50:51 MST 2025
+# Start of session at: Sat Jun  6 17:38:11 2026
+# Process ID         : 21044
+# Current directory  : C:/Users/noelk/full adder/full adder.runs/synth_1
+# Command line       : vivado.exe -log fullAdder.vds -product Vivado -mode batch -messageDb vivado.pb -notrace -source fullAdder.tcl
+# Log file           : C:/Users/noelk/full adder/full adder.runs/synth_1/fullAdder.vds
+# Journal file       : C:/Users/noelk/full adder/full adder.runs/synth_1\vivado.jou
+# Running On         : M-Frizfoot
+# Platform           : Windows Server 2016 or Windows 10
+# Operating System   : 26200
+# Processor Detail   : AMD Ryzen 9 9950X3D 16-Core Processor          
+# CPU Frequency      : 4292 MHz
+# CPU Physical cores : 16
+# CPU Logical cores  : 32
+# Host memory        : 33447 MB
+# Swap memory        : 5368 MB
+# Total Virtual      : 38816 MB
+# Available Virtual  : 26095 MB
+#-----------------------------------------------------------
+source fullAdder.tcl -notrace

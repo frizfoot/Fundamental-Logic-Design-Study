@@ -1,0 +1,4 @@
+Running: xsim.dir/thermostat_tb_behav/xsimk.exe -simmode gui -wdb thermostat_tb_behav.wdb -simrunnum 0 -socket 49753
+Design successfully loaded
+Design Loading Memory Usage: 11592 KB (Peak: 11592 KB)
+Design Loading CPU Usage: 0 ms

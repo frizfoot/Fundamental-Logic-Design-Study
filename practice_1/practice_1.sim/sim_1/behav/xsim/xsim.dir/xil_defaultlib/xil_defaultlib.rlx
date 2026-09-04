@@ -1,0 +1,11 @@
+0.7
+2020.2
+Nov 14 2025
+19:37:27
+C:/Users/noelk/practice_1/practice_1.sim/sim_1/behav/xsim/glbl.v,1756381829,verilog,,,,glbl,,uvm,,,,,,
+C:/Users/noelk/practice_1/practice_1.srcs/sim_1/new/ad42_tb.sv,1780159704,systemVerilog,,,,ad42_tb,,uvm,../../../../../../../AMDDesignTools/2025.2/Vivado/data/rsb/busdef,,,,,
+C:/Users/noelk/practice_1/practice_1.srcs/sim_1/new/ad42_tbvcd.sv,1780160787,systemVerilog,,,,ad42_tbvcd,,uvm,../../../../../../../AMDDesignTools/2025.2/Vivado/data/rsb/busdef,,,,,
+C:/Users/noelk/practice_1/practice_1.srcs/sim_1/new/simple_gates_tb.sv,1780068291,systemVerilog,,,,simple_gates_tb,,uvm,../../../../../../../AMDDesignTools/2025.2/Vivado/data/rsb/busdef,,,,,
+C:/Users/noelk/practice_1/practice_1.srcs/sources_1/new/ad2.sv,1780071941,systemVerilog,,C:/Users/noelk/practice_1/practice_1.srcs/sources_1/new/ad42.sv,,ad2,,uvm,../../../../../../../AMDDesignTools/2025.2/Vivado/data/rsb/busdef,,,,,
+C:/Users/noelk/practice_1/practice_1.srcs/sources_1/new/ad42.sv,1780071943,systemVerilog,,C:/Users/noelk/practice_1/practice_1.srcs/sim_1/new/ad42_tbvcd.sv,,ad42,,uvm,../../../../../../../AMDDesignTools/2025.2/Vivado/data/rsb/busdef,,,,,
+C:/Users/noelk/practice_1/practice_1.srcs/sources_1/new/simple_gates.sv,1780067617,systemVerilog,,C:/Users/noelk/practice_1/practice_1.srcs/sim_1/new/simple_gates_tb.sv,,simple_gates,,uvm,../../../../../../../AMDDesignTools/2025.2/Vivado/data/rsb/busdef,,,,,

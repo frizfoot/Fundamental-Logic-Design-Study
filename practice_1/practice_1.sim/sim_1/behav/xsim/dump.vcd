@@ -1,0 +1,94 @@
+$date
+   Sun May 31 02:03:54 2026
+$end
+
+$version
+  2025.2
+$end
+
+$timescale
+  1ps
+$end
+
+$scope module ad42_tbvcd $end
+$var reg 1 ! tb_a $end
+$var reg 1 " tb_b $end
+$var reg 1 # tb_c $end
+$var reg 1 $ tb_d $end
+$var reg 1 % tb_y $end
+$scope module uut $end
+$var wire 1 & A $end
+$var wire 1 ' B $end
+$var wire 1 ( C $end
+$var wire 1 ) D $end
+$var wire 1 * Y $end
+$var reg 1 + w0 $end
+$var reg 1 , w1 $end
+$scope module ad20 $end
+$var wire 1 & a $end
+$var wire 1 ' b $end
+$var wire 1 - y $end
+$upscope $end
+$scope module ad21 $end
+$var wire 1 ( a $end
+$var wire 1 ) b $end
+$var wire 1 . y $end
+$upscope $end
+$scope module ad22 $end
+$var wire 1 / a $end
+$var wire 1 0 b $end
+$var wire 1 * y $end
+$upscope $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+
+#0
+$dumpvars
+0!
+0"
+0#
+0$
+0%
+0&
+0'
+0(
+0)
+0*
+0+
+0,
+0-
+0.
+0/
+00
+$end
+
+#10000
+1"
+1$
+1'
+1)
+
+#20000
+1!
+0"
+1#
+0$
+1&
+0'
+1(
+0)
+
+#30000
+1"
+1$
+1%
+1'
+1)
+1*
+1+
+1,
+1-
+1.
+1/
+10
