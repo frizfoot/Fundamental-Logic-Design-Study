@@ -1,0 +1,1 @@
+--incr --debug "typical" --relax --mt "2" -L "xil_defaultlib" -L "uvm" -L "unisims_ver" -L "unimacro_ver" -L "secureip" --snapshot "P1010s_behav" "xil_defaultlib.P1010s" "xil_defaultlib.glbl" -log "elaborate.log" 
