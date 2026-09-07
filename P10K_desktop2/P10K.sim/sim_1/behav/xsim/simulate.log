@@ -1,0 +1,7 @@
+Time resolution is 1 ps
+PASS: e=00 -> f=000111
+PASS: e=01 -> f=101010
+PASS: e=10 -> f=111000
+PASS: e=11 -> f=010101
+--- simulation finished ---
+$finish called at time : 40 ns : File "C:/Users/noelk/P10K/P10K.srcs/sim_1/new/simul.sv" Line 32
