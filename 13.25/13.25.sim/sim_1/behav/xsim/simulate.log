@@ -1,0 +1,24 @@
+Time resolution is 1 ps
+──────────────────────────────────────────────────────
+  # │ 엣지직전(정답)        │ 엣지직후(전이)
+────┼───────────────────────┼─────────────────────────
+ 0.0 ns | clk=0 X=1 Q=0x D=xx Z=x
+ 5.0 ns | clk=1 X=1 Q=0x D=xx Z=x
+  1 │  9.0 Q=0x X=1 Z=x���� │10.0 ns | clk=0 X=1 Q=xx D=xx Z=x
+ 11.0 Q=xx X=1 Z=x
+15.0 ns | clk=1 X=0 Q=xx D=xx Z=x
+  2 │ 19.0 Q=xx X=0 Z=x���� │20.0 ns | clk=0 X=0 Q=xx D=xx Z=x
+ 21.0 Q=xx X=0 Z=x
+25.0 ns | clk=1 X=0 Q=xx D=xx Z=x
+  3 │ 29.0 Q=xx X=0 Z=x���� │30.0 ns | clk=0 X=0 Q=xx D=xx Z=x
+ 31.0 Q=xx X=0 Z=x
+35.0 ns | clk=1 X=1 Q=xx D=xx Z=x
+  4 │ 39.0 Q=xx X=1 Z=x���� │40.0 ns | clk=0 X=1 Q=xx D=xx Z=x
+ 41.0 Q=xx X=1 Z=x
+45.0 ns | clk=1 X=1 Q=xx D=xx Z=x
+  5 │ 49.0 Q=xx X=1 Z=x���� │50.0 ns | clk=0 X=1 Q=xx D=xx Z=x
+ 51.0 Q=xx X=1 Z=x
+55.0 ns | clk=1 X=1 Q=xx D=xx Z=x
+──────────────────────────────────────────────────────
+20838624674631780594045580304706164309309          5
+$finish called at time : 59 ns : File "C:/Users/noelk/Vivado/13.25/13.25.srcs/sim_1/new/sim1.sv" Line 47

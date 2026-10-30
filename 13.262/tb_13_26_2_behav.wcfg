@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="tb_13_26_2_behav.wdb" id="1">
+         <top_modules>
+            <top_module name="glbl" />
+            <top_module name="tb_13_26_2" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <zoom_setting>
+      <ZoomStartTime time="0.018 ns"></ZoomStartTime>
+      <ZoomEndTime time="265.019 ns"></ZoomEndTime>
+      <Cursor1Time time="44.818 ns"></Cursor1Time>
+   </zoom_setting>
+   <column_width_setting>
+      <NameColumnWidth column_width="276"></NameColumnWidth>
+      <ValueColumnWidth column_width="70"></ValueColumnWidth>
+   </column_width_setting>
+   <WVObjectSize size="14" />
+   <wvobject fp_name="/tb_13_26_2/clk" type="logic">
+      <obj_property name="ElementShortName">clk</obj_property>
+      <obj_property name="ObjectShortName">clk</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_13_26_2/x1" type="logic">
+      <obj_property name="ElementShortName">x1</obj_property>
+      <obj_property name="ObjectShortName">x1</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_13_26_2/x2" type="logic">
+      <obj_property name="ElementShortName">x2</obj_property>
+      <obj_property name="ObjectShortName">x2</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_13_26_2/z1" type="logic">
+      <obj_property name="ElementShortName">z1</obj_property>
+      <obj_property name="ObjectShortName">z1</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_13_26_2/z2" type="logic">
+      <obj_property name="ElementShortName">z2</obj_property>
+      <obj_property name="ObjectShortName">z2</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_13_26_2/q" type="array">
+      <obj_property name="ElementShortName">q[1:0]</obj_property>
+      <obj_property name="ObjectShortName">q[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_13_26_2/d" type="array">
+      <obj_property name="ElementShortName">d[1:0]</obj_property>
+      <obj_property name="ObjectShortName">d[1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_13_26_2/exp_q" type="array">
+      <obj_property name="ElementShortName">exp_q[0:3][1:0]</obj_property>
+      <obj_property name="ObjectShortName">exp_q[0:3][1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_13_26_2/exp_z" type="array">
+      <obj_property name="ElementShortName">exp_z[0:3][1:0]</obj_property>
+      <obj_property name="ObjectShortName">exp_z[0:3][1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_13_26_2/post_z" type="array">
+      <obj_property name="ElementShortName">post_z[0:3][1:0]</obj_property>
+      <obj_property name="ObjectShortName">post_z[0:3][1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_13_26_2/post_q" type="array">
+      <obj_property name="ElementShortName">post_q[0:3][1:0]</obj_property>
+      <obj_property name="ObjectShortName">post_q[0:3][1:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_13_26_2/errors" type="array">
+      <obj_property name="ElementShortName">errors[31:0]</obj_property>
+      <obj_property name="ObjectShortName">errors[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_13_26_2/T" type="other">
+      <obj_property name="ElementShortName">T</obj_property>
+      <obj_property name="ObjectShortName">T</obj_property>
+   </wvobject>
+   <wvobject fp_name="/tb_13_26_2/N" type="array">
+      <obj_property name="ElementShortName">N[31:0]</obj_property>
+      <obj_property name="ObjectShortName">N[31:0]</obj_property>
+   </wvobject>
+</wave_config>
