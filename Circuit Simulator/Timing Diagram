@@ -1,0 +1,2333 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+타이밍 다이어그램 에디터
+- 전체 시간 t, 노드 이름, 클럭 on/off, 구간 이름, 회로도 이미지 삽입
+- 조합식(combinational): 다른 노드 이름으로 식을 쓰면 같은 칸의 값으로 계산합니다.
+  식 문법은 SystemVerilog 그대로입니다(~ ! & && | || ^ ~^ == != ?:).
+- 순차식(sequential): 클럭의 활성 에지에서 바로 앞 칸의 값으로 계산해 넣고,
+  다음 활성 에지까지 그 값을 그대로 붙듭니다(플립플롭).
+  판단할 정보가 모자라면 그 칸은 ?로 표시하고 파형은 0에 둡니다.
+- 표준 라이브러리(tkinter)만으로 실행됩니다. Pillow가 있으면 PNG 내보내기와
+  JPG 회로도까지 지원합니다.  (pip install pillow)
+"""
+
+import itertools
+import json
+import math
+import os
+import re
+import sys
+import tkinter as tk
+from tkinter import ttk, filedialog, simpledialog, messagebox
+
+try:
+    from PIL import Image, ImageTk, ImageDraw, ImageFont
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+
+# ── 색 / 치수 ────────────────────────────────────────────────────────
+PAPER = "#FFFFFF"
+GRID = "#E1E8EE"
+GRID_MAJOR = "#C6D2DC"
+INK = "#101922"
+MUTED = "#67767F"
+LINE = "#CCD7E0"
+ACCENT = "#1750E8"
+EDGEMARK = "#96B3F2"   # 순차 노드가 값을 집는 에지 표시
+EDGELINE = "#5B8DEF"   # 클럭 에지에 긋는 파란 점선
+SOFT = "#EAF0FF"       # 상태 천이도의 원 채움
+GHOST = "#B6C2CC"      # 갈 수 없는 상태
+NODE_R = 27            # 상태 원 반지름
+VALUE = "#1750E8"      # 각 칸의 0/1 표시 색
+UNKNOWN = "#8A94A6"    # 계산할 수 없는 칸(?) 표시 색
+FALSE = "F"            # 손으로 찍는 F(false) 칸. 값으로는 0 으로 셉니다
+
+PAD, GUT, ROW, AMP, AXIS, IMG_GAP = 22, 112, 58, 13, 32, 16
+GROUP_H = 26           # 회로 제목이 차지하는 높이
+
+KEY_HINT = ("클릭·드래그: H/L 바꾸기      F 누른 뒤 클릭: F(false) 넣기      "
+            "이름 클릭: 이름 고치기      ▲▼ / ↑↓: 줄 옮기기")
+KEY_HINT_F = "F 입력 중 — 칸을 클릭하거나 끌면 F 가 들어갑니다 (F 나 Esc 를 누르면 끝)"
+ELINE_TEXT = ("에지선 없음", "상승 \u2191", "하강 \u2193", "둘 다")
+ELINE_KEY = {ELINE_TEXT[0]: "", ELINE_TEXT[1]: "rise",
+             ELINE_TEXT[2]: "fall", ELINE_TEXT[3]: "both"}
+FSM_HELP = ("상태 천이도는 지금 노드에서 그대로 뽑습니다.\n"
+            "  · 순차식 노드  -> 상태 변수 (처음값이 처음 상태가 됩니다)\n"
+            "  · 그 식에 쓰인 신호 노드 -> 입력\n"
+            "  · 조합식 노드  -> 출력 (입력이 들어가면 Mealy, 아니면 Moore)")
+EQ_HINT = "SystemVerilog 표기:  ~ !  &  &&  |  ||  ^  ~^  ==  !=  ? :  0 1 1'b0"
+
+if sys.platform == "darwin":
+    MONO = "Menlo"
+elif sys.platform.startswith("win"):
+    MONO = "Consolas"
+else:
+    MONO = "DejaVu Sans Mono"
+
+FONT_CANDIDATES = [
+    "DejaVuSansMono.ttf", "consola.ttf", "Menlo.ttc", "cour.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+    "C:/Windows/Fonts/consola.ttf", "/System/Library/Fonts/Menlo.ttc",
+]
+
+# PNG 로 내보낼 때 한글에 쓸 글꼴
+CJK_CANDIDATES = [
+    "C:/Windows/Fonts/malgun.ttf", "malgun.ttf",
+    "/System/Library/Fonts/AppleSDGothicNeo.ttc", "AppleSDGothicNeo.ttc",
+    "/usr/share/fonts/truetype/nanum/NanumGothic.ttf", "NanumGothic.ttf",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    "NotoSansCJK-Regular.ttc", "NotoSansKR-Regular.otf",
+]
+
+
+def has_cjk(text):
+    return any(ord(c) > 0x2FFF for c in text)
+
+# ── 식 파서 (SystemVerilog 연산자) ──────────────────────────────────
+#   NOT  : ~a, !a            AND : a & b, a && b      OR  : a | b, a || b
+#   XOR  : a ^ b             XNOR: a ~^ b, a ^~ b     같다/다르다: a == b, a != b
+#   고르기: c ? a : b         괄호: ( )                상수: 0, 1, 1'b0, 1'b1
+#   묶는 차례도 SystemVerilog 그대로입니다: ~ > == != > & > ^ > | > && > || > ?:
+class EqError(Exception):
+    pass
+
+
+TOKEN = re.compile(r"""\s*(
+      [01]'[bB][01]                      # 1'b0 / 1'b1
+    | '[01]                              # '0 / '1
+    | [A-Za-z_][A-Za-z_0-9]*             # 이름
+    | [01]                               # 0 / 1
+    | ~\^ | \^~ | == | != | && | \|\|    # 두 글자 연산자를 먼저
+    | [~!&|^()?:]
+)""", re.X)
+
+# 불 대수식을 쓰던 분을 위한 길잡이
+OLD_OPS = {"+": "OR 는 | 입니다", "*": "AND 는 & 입니다",
+           ".": "AND 는 & 입니다", "'": "NOT 은 앞에 붙이는 ~ 입니다"}
+
+
+def tokenize(src):
+    out, i = [], 0
+    while i < len(src):
+        if src[i].isspace():
+            i += 1
+            continue
+        m = TOKEN.match(src, i)
+        if not m:
+            hint = OLD_OPS.get(src[i])
+            raise EqError("쓸 수 없는 기호: %r%s"
+                          % (src[i], "  — " + hint if hint else ""))
+        out.append(m.group(1))
+        i = m.end()
+    return out
+
+
+class Parser:
+    """재귀 하강 파서 -> 튜플 트리. 묶는 차례는 SystemVerilog 를 따릅니다."""
+
+    def __init__(self, src, known=()):
+        self.t = tokenize(src)
+        self.i = 0
+
+    def peek(self):
+        return self.t[self.i] if self.i < len(self.t) else None
+
+    def take(self):
+        tok = self.peek()
+        self.i += 1
+        return tok
+
+    def expect(self, tok):
+        if self.take() != tok:
+            raise EqError("%r 가 있어야 합니다" % tok)
+
+    def parse(self):
+        if not self.t:
+            raise EqError("식이 비어 있습니다")
+        node = self.p_cond()
+        if self.peek() is not None:
+            tok = self.peek()
+            hint = ("  — 사이에 연산자를 넣으세요(붙여 쓰는 AND 는 없습니다)"
+                    if re.match(r"^[A-Za-z_0-9(]", tok) else "")
+            raise EqError("식을 끝까지 읽지 못했습니다: %r 부근%s" % (tok, hint))
+        return node
+
+    def p_cond(self):                       # c ? a : b
+        n = self.p_lor()
+        if self.peek() == "?":
+            self.take()
+            a = self.p_cond()
+            self.expect(":")
+            return ("mux", n, a, self.p_cond())
+        return n
+
+    def p_lor(self):                        # ||
+        n = self.p_land()
+        while self.peek() == "||":
+            self.take()
+            n = ("or", n, self.p_land())
+        return n
+
+    def p_land(self):                       # &&
+        n = self.p_bor()
+        while self.peek() == "&&":
+            self.take()
+            n = ("and", n, self.p_bor())
+        return n
+
+    def p_bor(self):                        # |
+        n = self.p_bxor()
+        while self.peek() == "|":
+            self.take()
+            n = ("or", n, self.p_bxor())
+        return n
+
+    def p_bxor(self):                       # ^  ~^  ^~
+        n = self.p_band()
+        while self.peek() in ("^", "~^", "^~"):
+            op = "xor" if self.take() == "^" else "xnor"
+            n = (op, n, self.p_band())
+        return n
+
+    def p_band(self):                       # &
+        n = self.p_eq()
+        while self.peek() == "&":
+            self.take()
+            n = ("and", n, self.p_eq())
+        return n
+
+    def p_eq(self):                         # ==  !=   (1비트에서는 XNOR/XOR)
+        n = self.p_unary()
+        while self.peek() in ("==", "!="):
+            op = "xnor" if self.take() == "==" else "xor"
+            n = (op, n, self.p_unary())
+        return n
+
+    def p_unary(self):                      # ~a  !a
+        if self.peek() in ("~", "!"):
+            self.take()
+            return ("not", self.p_unary())
+        return self.p_atom()
+
+    def p_atom(self):
+        tok = self.take()
+        if tok is None:
+            raise EqError("식이 중간에 끊겼습니다")
+        if tok == "(":
+            n = self.p_cond()
+            self.expect(")")
+            return n
+        if tok in ("0", "1"):
+            return ("const", int(tok))
+        if tok[-1] in "01" and ("'" in tok):          # 1'b0 / '1 꼴
+            return ("const", int(tok[-1]))
+        if re.match(r"^[A-Za-z_]", tok):
+            return ("var", tok)
+        raise EqError("예상하지 못한 기호: %r" % tok)
+
+
+def ev3(node, look):
+    """0 / 1 / None(모름) 3값 계산. look(name) 도 같은 3값을 돌려줍니다."""
+    k = node[0]
+    if k == "const":
+        return node[1]
+    if k == "var":
+        return look(node[1])
+    if k == "not":
+        v = ev3(node[1], look)
+        return None if v is None else 1 - v
+    if k == "mux":                                  # c ? a : b
+        c = ev3(node[1], look)
+        if c is not None:
+            return ev3(node[2] if c else node[3], look)
+        a, b = ev3(node[2], look), ev3(node[3], look)
+        return a if a is not None and a == b else None   # 두 쪽이 같으면 정해집니다
+    a, b = ev3(node[1], look), ev3(node[2], look)
+    if k == "and":
+        if a == 0 or b == 0:          # 한쪽이 0이면 나머지는 몰라도 0
+            return 0
+        return None if a is None or b is None else a & b
+    if k == "or":
+        if a == 1 or b == 1:          # 한쪽이 1이면 나머지는 몰라도 1
+            return 1
+        return None if a is None or b is None else a | b
+    if a is None or b is None:
+        return None
+    return (a ^ b) if k == "xor" else 1 - (a ^ b)
+
+
+def used_names(node, acc=None):
+    acc = set() if acc is None else acc
+    if node[0] == "var":
+        acc.add(node[1])
+    elif node[0] in ("and", "or", "xor", "xnor"):
+        used_names(node[1], acc)
+        used_names(node[2], acc)
+    elif node[0] == "not":
+        used_names(node[1], acc)
+    elif node[0] == "mux":
+        for q in node[1:]:
+            used_names(q, acc)
+    return acc
+
+
+# ── 상태 ─────────────────────────────────────────────────────────────
+class State:
+    def __init__(self):
+        self.steps = 24
+        self.cellw = 30
+        self.unit = ""
+        self.title = "타이밍 다이어그램"
+        self.show_grid = True
+        self.show_values = True   # 칸마다 0/1 표시
+        self.edge_line = ""       # 클럭 에지 점선: "" / rise / fall / both
+        self.img = None          # PIL.Image 또는 tk.PhotoImage 원본
+        self.img_path = ""
+        self.img_scale = 70
+        self.cursor = None
+        self._ast_cache = {}     # 식 문자열 -> (트리, 오류문구)
+        self._seq = {}           # 순차 노드 -> 칸별로 푼 값
+        self._solved = False
+        self.signals = self.seed()
+
+    def seed(self):
+        H = [1 if i <= 8 else 0 if i <= 10 else 1 if i <= 19 else 0 if i <= 21 else 1
+             for i in range(24)]
+        V = [0 if i == 0 else 1 for i in range(24)]
+        return [
+            dict(name="clock", type="clk", period=2, inv=False, values=[], labels=[]),
+            dict(name="Hsync", type="sig", period=2, inv=False, values=H,
+                 labels=[dict(s=0, e=8, text="H_1line"), dict(s=11, e=19, text="H_2line")]),
+            dict(name="Vsync", type="sig", period=2, inv=False, values=V,
+                 labels=[dict(s=1, e=20, text="V_1line")]),
+            dict(name="disp", type="eq", period=2, inv=False, expr="Hsync & Vsync",
+                 values=[], labels=[]),
+        ]
+
+    def seed_seq(self):
+        """순차 회로 예제: 입력 X, 상태 A, 출력 Z(Mealy) / Y(Moore)."""
+        self.__init__()
+        self.title = "순차 회로 타이밍"
+        X = [0] * 4 + [1] * 8 + [0] * 4 + [1] * 8
+        self.signals = [
+            dict(name="clock", type="clk", period=4, inv=False, expr="",
+                 values=[], labels=[]),
+            dict(name="X", type="sig", period=2, inv=False, expr="",
+                 values=X[:self.steps], labels=[]),
+            dict(name="A", type="seq", period=2, inv=False, expr="A ^ X",
+                 clk="clock", edge="rise", init=0, values=[], labels=[]),
+            dict(name="Z", type="eq", period=2, inv=False, expr="A & X",
+                 values=[], labels=[]),
+            dict(name="Y", type="eq", period=2, inv=False, expr="~A",
+                 values=[], labels=[]),
+        ]
+
+    def blank(self):
+        """빈 문서(클럭 1줄 + 신호 1줄)로 되돌립니다."""
+        self.__init__()
+        self.signals = [
+            dict(name="clock", type="clk", period=2, inv=False, values=[], labels=[]),
+            dict(name="node1", type="sig", period=2, inv=False,
+                 values=[0] * self.steps, labels=[]),
+        ]
+
+    # 값 읽기
+    def val(self, sig, i):
+        """그리기용 0/1. 계산할 수 없으면 0으로 둡니다."""
+        v = self.val3(sig, i)
+        return 0 if v is None else v
+
+    def raw(self, sig, i):
+        """손으로 찍은 칸 그대로(0 / 1 / "F")."""
+        vs = sig.get("values") or []
+        return vs[i] if i < len(vs) else 0
+
+    def cell_text(self, sig, i):
+        """칸에 적을 글자: 0 / 1 / F / ?"""
+        if sig.get("type") == "sig" and self.raw(sig, i) == FALSE:
+            return FALSE
+        v = self.val3(sig, i)
+        return "?" if v is None else ("1" if v else "0")
+
+    def val3(self, sig, i, seen=()):
+        """0 / 1 / None(정보가 모자람)."""
+        t = sig.get("type", "sig")
+        if t == "clk":
+            p = max(2, int(sig.get("period", 2)))
+            hi = 1 if ((i - int(sig.get("phase", 0))) % p) >= p / 2 else 0
+            return 1 - hi if sig.get("inv") else hi
+        if t == "eq":
+            return self._eval_eq(sig, i, seen)
+        if t == "seq":
+            self.solve()
+            ser = self._seq.get(id(sig))
+            return ser[i] if ser is not None and i < len(ser) else None
+        v = self.raw(sig, i)
+        return 0 if v == FALSE else v
+
+    def _eval_eq(self, sig, i, seen=()):
+        if sig["name"] in seen:          # 서로 물고 도는 식
+            return None
+        node, _err = self.ast_of(sig)
+        if node is None:
+            return None
+        seen = seen + (sig["name"],)
+        return ev3(node, lambda nm: self._look(nm, i, sig, seen))
+
+    def find(self, name, me=None, allow_self=False):
+        """이름으로 노드를 찾습니다. 같은 회로 것을 먼저 봅니다."""
+        def ok(s):
+            return s["name"] == name and (allow_self or s is not me)
+        if me is not None:
+            mine = me.get("group", "")
+            same = [s for s in self.signals
+                    if s["name"] == name and s.get("group", "") == mine]
+            if same:            # 제 회로에 그 이름이 있으면 남의 회로는 안 봅니다
+                return next((s for s in same if ok(s)), None)
+        return next((s for s in self.signals if ok(s)), None)
+
+    def _look(self, name, i, me, seen, allow_self=False):
+        src = self.find(name, me, allow_self)
+        return None if src is None else self.val3(src, i, seen)
+
+    # ── 순차(클럭에 물린) 노드 ──
+    def invalidate(self):
+        """값이 바뀌었으니 풀어 둔 순차 값을 버립니다."""
+        self._seq = {}
+        self._solved = False
+
+    def clock_of(self, sig):
+        """그 노드를 움직이는 클럭 노드.
+
+        따로 고른 클럭이 있으면 그것을, 없거나 사라졌으면 맨 위 클럭을 씁니다.
+        """
+        nm = sig.get("clk", "")
+        if nm:
+            got = self.find(nm, sig)
+            if got is not None:
+                return got
+        mine = sig.get("group", "")
+        return (next((s for s in self.signals if s.get("type") == "clk"
+                      and s is not sig and s.get("group", "") == mine), None) or
+                next((s for s in self.signals if s.get("type") == "clk"
+                      and s is not sig), None))
+
+    def edge_at(self, sig, i):
+        """i 칸으로 넘어오면서 활성 에지가 있었는지."""
+        ck = self.clock_of(sig)
+        if ck is None or i <= 0:
+            return None if ck is None else False
+        a, b = self.val3(ck, i - 1), self.val3(ck, i)
+        if a is None or b is None:
+            return None
+        return (a, b) == ((0, 1) if sig.get("edge", "rise") == "rise" else (1, 0))
+
+    def solve(self):
+        """순차 노드를 0번 칸부터 한 칸씩, 다 같이 풀어 둡니다."""
+        if self._solved:
+            return
+        self._solved = True                      # 푸는 중의 되돌이 호출을 막습니다
+        seqs = [s for s in self.signals if s.get("type") == "seq"]
+        if not seqs:
+            return
+        self._seq = {id(s): [None] * self.steps for s in seqs}
+        for i in range(self.steps):
+            for s in seqs:
+                self._seq[id(s)][i] = self._seq_step(s, i)
+
+    def _seq_step(self, sig, i):
+        if self.clock_of(sig) is None:           # 클럭이 없으면 알 수 없습니다
+            return None
+        if i == 0:
+            return 1 if sig.get("init") else 0
+        prev = self._seq[id(sig)][i - 1]
+        hit = self.edge_at(sig, i)
+        if hit is None:
+            return None
+        if not hit:
+            return prev                          # 에지가 아니면 그대로 붙듭니다
+        node, _err = self.ast_of(sig)
+        if node is None:
+            return None
+        # 에지 바로 앞 칸의 값으로 다음 값을 정합니다
+        return ev3(node, lambda nm: self._look(nm, i - 1, sig, (), True))
+
+    def ast_of(self, sig):
+        """식을 파싱해 (트리, 오류문구)를 돌려줍니다. 결과는 캐시합니다."""
+        expr = (sig.get("expr") or "").strip()
+        if not expr:
+            return None, "식이 비어 있습니다"
+        key = expr
+        if key not in self._ast_cache:
+            if len(self._ast_cache) > 256:
+                self._ast_cache.clear()
+            try:
+                self._ast_cache[key] = (Parser(expr).parse(), "")
+            except EqError as ex:
+                self._ast_cache[key] = (None, str(ex))
+            except Exception as ex:                    # 파서가 놓친 경우까지
+                self._ast_cache[key] = (None, "읽을 수 없는 식: %s" % ex)
+        return self._ast_cache[key]
+
+    def refs_of(self, sig):
+        """그 식이 가리키는 노드들."""
+        node, _err = self.ast_of(sig)
+        if node is None:
+            return []
+        out = []
+        for nm in sorted(used_names(node)):
+            src = next((s for s in self.signals if s["name"] == nm), None)
+            if src is not None:
+                out.append(src)
+        return out
+
+    def kind_of(self, sig):
+        """조합식이 상태에 물려 있으면 Moore / Mealy 를 가려 줍니다."""
+        if sig.get("type") != "eq":
+            return ""
+        refs = self.refs_of(sig)
+        st_refs = [s for s in refs if s.get("type") == "seq"]
+        in_refs = [s for s in refs if s.get("type") == "sig"]
+        if not st_refs:
+            return ""
+        return "Mealy 출력(상태+입력)" if in_refs else "Moore 출력(상태만)"
+
+    def eq_error(self, sig):
+        """식 노드의 상태 문구(빈 문자열이면 정상)."""
+        t = sig.get("type")
+        if t not in ("eq", "seq"):
+            return ""
+        self.invalidate()
+        if t == "seq" and self.clock_of(sig) is None:
+            nm = sig.get("clk", "")
+            return ("클럭을 찾을 수 없습니다: %s" % nm) if nm else                    "클럭 노드가 없습니다 — 클럭을 고르세요"
+        node, err = self.ast_of(sig)
+        if node is None:
+            return err
+        missing = sorted(nm for nm in used_names(node)
+                         if self.find(nm, sig, t == "seq") is None)
+        if missing:
+            return "모르는 이름: %s" % ", ".join(missing)
+        if any(self.val3(sig, i) is None for i in range(self.steps)):
+            return "정보가 모자란 칸은 ?로 둡니다"
+        if t == "seq":
+            ck = self.clock_of(sig)
+            return "%s %s 에지마다 바로 앞 값으로 바뀝니다" % (
+                ck["name"], "↑" if sig.get("edge", "rise") == "rise" else "↓")
+        return self.kind_of(sig) or "식대로 계산했습니다"
+
+    def rename(self, r, new):
+        """노드 이름을 바꾸고, 그 이름을 쓰던 식도 따라 고칩니다."""
+        old = self.signals[r]["name"]
+        new = (new or "").strip()[:16]
+        if not new or new == old:
+            return False
+        mine = self.signals[r].get("group", "")
+        kin = [sg for sg in self.signals if sg.get("group", "") == mine]
+        self.signals[r]["name"] = new
+        for sg in kin:                           # 클럭으로 가리키던 곳도 함께
+            if sg.get("clk") == old:
+                sg["clk"] = new
+        if re.match(r"^[A-Za-z_][A-Za-z_0-9]*$", old):
+            pat = re.compile(r"(?<![A-Za-z_0-9])%s(?![A-Za-z_0-9])" % re.escape(old))
+            for sg in kin:                       # 같은 회로의 식만 고칩니다
+                if sg.get("type") in ("eq", "seq") and (sg.get("expr") or "").strip():
+                    sg["expr"] = pat.sub(new, sg["expr"])
+        self._ast_cache.clear()
+        self.invalidate()
+        return True
+
+    def set_val(self, row, i, v):
+        sig = self.signals[row]
+        if sig["type"] in ("clk", "eq", "seq"):
+            return
+        self.invalidate()
+        vs = sig["values"]
+        if len(vs) < self.steps:
+            vs.extend([0] * (self.steps - len(vs)))
+        vs[i] = v
+
+    # ── 회로(그룹) ──
+    def blocks(self):
+        """이어진 줄끼리 회로 묶음으로 나눕니다 -> [(이름, [줄 번호]), ...]."""
+        out = []
+        for i, g in enumerate(self.signals):
+            nm = g.get("group", "")
+            if out and out[-1][0] == nm:
+                out[-1][1].append(i)
+            else:
+                out.append((nm, [i]))
+        return out
+
+    def group_names(self):
+        seen = []
+        for g in self.signals:
+            nm = g.get("group", "")
+            if nm not in seen:
+                seen.append(nm)
+        return seen
+
+    def rows_of(self, name):
+        return [i for i, g in enumerate(self.signals)
+                if g.get("group", "") == name]
+
+    def row_at(self, y):
+        """그 y 자리에 있는 줄 번호. 없으면 None."""
+        for r, top in self.layout()[0].items():
+            if top <= y < top + ROW:
+                return r
+        return None
+
+    def layout(self):
+        """(줄 -> y, [(회로 이름, y), ...], 전체 높이)."""
+        tops, heads, y = {}, [], self.chart_top
+        for nm, idx in self.blocks():
+            if nm:
+                heads.append((nm, y))
+                y += GROUP_H
+            for r in idx:
+                tops[r] = y
+                y += ROW
+        return tops, heads, y - self.chart_top
+
+    # 도형 좌표
+    @property
+    def chart_x(self):
+        return PAD + GUT
+
+    @property
+    def chart_w(self):
+        return self.steps * self.cellw
+
+    def img_box(self):
+        if self.img is None:
+            return 0, 0
+        w = int((GUT + self.chart_w) * self.img_scale / 100)
+        iw, ih = self.img.size if HAS_PIL else (self.img.width(), self.img.height())
+        h = max(1, int(w * ih / iw))
+        return w, h
+
+    @property
+    def chart_top(self):
+        _, h = self.img_box()
+        return PAD + (h + IMG_GAP if self.img is not None else 0) + 14
+
+    @property
+    def chart_h(self):
+        return self.layout()[2]
+
+    def row_top(self, r):
+        return self.layout()[0].get(r, self.chart_top + r * ROW)
+
+    def y_mid(self, r):
+        return self.row_top(r) + ROW / 2
+
+    @property
+    def total_w(self):
+        return PAD * 2 + GUT + self.chart_w
+
+    @property
+    def total_h(self):
+        return self.chart_top + self.chart_h + AXIS + PAD
+
+    def clock_edges(self, kind=None, ck=None):
+        """클럭이 바뀌는 칸 번호. kind: rise / fall / both."""
+        kind = self.edge_line if kind is None else kind
+        if not kind:
+            return []
+        if ck is None:
+            ck = next((g for g in self.signals if g.get("type") == "clk"), None)
+        if ck is None:
+            return []
+        out = []
+        for i in range(1, self.steps):
+            a, b = self.val3(ck, i - 1), self.val3(ck, i)
+            if a is None or b is None:
+                continue
+            if (a, b) == (0, 1) and kind in ("rise", "both"):
+                out.append(i)
+            elif (a, b) == (1, 0) and kind in ("fall", "both"):
+                out.append(i)
+        return out
+
+    def tick_every(self):
+        need = -(-26 // self.cellw)
+        for n in (1, 2, 5, 10, 20):
+            if n >= need:
+                return n
+        return 25
+
+    # 저장 / 복원
+    def to_dict(self):
+        return dict(steps=self.steps, cellw=self.cellw, unit=self.unit, title=self.title,
+                    show_grid=self.show_grid, show_values=self.show_values,
+                    edge_line=self.edge_line, img_path=self.img_path,
+                    img_scale=self.img_scale, signals=self.signals)
+
+    def from_dict(self, d):
+        self.steps = d.get("steps", 24)
+        self.cellw = d.get("cellw", 30)
+        self.unit = d.get("unit", "")
+        self.title = d.get("title", "타이밍 다이어그램")
+        self.show_grid = d.get("show_grid", True)
+        self.show_values = d.get("show_values", True)
+        self.edge_line = d.get("edge_line", "")
+        self.img_scale = d.get("img_scale", 70)
+        self.signals = d.get("signals", self.seed())
+        for sg in self.signals:                     # 옛 파일에는 없던 칸들
+            sg.setdefault("expr", "")
+            sg.setdefault("labels", [])
+            sg.setdefault("values", [])
+            sg.setdefault("clk", "")
+            sg.setdefault("edge", "rise")
+            sg.setdefault("init", 0)
+            sg.setdefault("phase", 0)
+            sg.setdefault("group", "")
+        self.invalidate()
+        self._ast_cache.clear()
+        self.img_path = d.get("img_path", "")
+
+
+# ── 렌더링 백엔드 ────────────────────────────────────────────────────
+class TkBackend:
+    """tkinter Canvas에 그립니다."""
+
+    def __init__(self, canvas, tag=None):
+        self.c = canvas
+        self.tag = (tag,) if tag else ()
+
+    def line(self, x1, y1, x2, y2, color=INK, width=1, dash=None):
+        self.c.create_line(x1, y1, x2, y2, fill=color, width=width,
+                           dash=dash, tags=self.tag)
+
+    def path(self, pts, color=INK, width=2):
+        flat = [v for p in pts for v in p]
+        self.c.create_line(*flat, fill=color, width=width, tags=self.tag)
+
+    def rect(self, x1, y1, x2, y2, fill="", outline="", dash=None):
+        self.c.create_rectangle(x1, y1, x2, y2, fill=fill, outline=outline,
+                                dash=dash, tags=self.tag)
+
+    def polygon(self, pts, fill=INK, outline=""):
+        flat = [v for q in pts for v in q]
+        self.c.create_polygon(*flat, fill=fill, outline=outline, tags=self.tag)
+
+    def polyline(self, pts, color=INK, width=2, dash=None):
+        flat = [v for q in pts for v in q]
+        self.c.create_line(*flat, fill=color, width=width, dash=dash, tags=self.tag)
+
+    def ellipse(self, x1, y1, x2, y2, fill="", outline=INK, width=2, dash=None):
+        self.c.create_oval(x1, y1, x2, y2, fill=fill, outline=outline,
+                           width=width, dash=dash, tags=self.tag)
+
+    def text(self, x, y, s, color=INK, size=12, anchor="w", bold=False):
+        a = {"w": "w", "e": "e", "c": "center"}[anchor]
+        self.c.create_text(x, y, text=s, fill=color, anchor=a, tags=self.tag,
+                           font=(MONO, size, "bold" if bold else "normal"))
+
+    def image(self, x, y, w, h, img):
+        self.c.create_image(x, y, image=img, anchor="nw", tags=self.tag)
+
+
+class PilBackend:
+    """Pillow 이미지에 그립니다(PNG 내보내기용)."""
+
+    def __init__(self, im, scale=2):
+        self.d = ImageDraw.Draw(im)
+        self.im = im
+        self.k = scale
+        self._fonts = {}
+
+    def _font(self, size, bold, cjk=False):
+        key = (size, bold, cjk)
+        if key not in self._fonts:
+            f = None
+            for cand in (CJK_CANDIDATES if cjk else []) + FONT_CANDIDATES:
+                try:
+                    f = ImageFont.truetype(cand, int(size * self.k))
+                    break
+                except Exception:
+                    continue
+            self._fonts[key] = f or ImageFont.load_default()
+        return self._fonts[key]
+
+    def line(self, x1, y1, x2, y2, color=INK, width=1, dash=None):
+        k = self.k
+        self.d.line([x1 * k, y1 * k, x2 * k, y2 * k], fill=color, width=max(1, int(width * k)))
+
+    def path(self, pts, color=INK, width=2):
+        k = self.k
+        self.d.line([(x * k, y * k) for x, y in pts], fill=color,
+                    width=max(1, int(width * k)), joint="curve")
+
+    def rect(self, x1, y1, x2, y2, fill="", outline="", dash=None):
+        k = self.k
+        self.d.rectangle([x1 * k, y1 * k, x2 * k, y2 * k],
+                         fill=fill or None, outline=outline or None)
+
+    def polygon(self, pts, fill=INK, outline=""):
+        k = self.k
+        self.d.polygon([(x * k, y * k) for x, y in pts],
+                       fill=fill or None, outline=outline or None)
+
+    def polyline(self, pts, color=INK, width=2, dash=None):
+        k = self.k
+        self.d.line([(x * k, y * k) for x, y in pts], fill=color,
+                    width=max(1, int(width * k)), joint="curve")
+
+    def ellipse(self, x1, y1, x2, y2, fill="", outline=INK, width=2, dash=None):
+        k = self.k
+        self.d.ellipse([x1 * k, y1 * k, x2 * k, y2 * k], fill=fill or None,
+                       outline=outline or None, width=max(1, int(width * k)))
+
+    def text(self, x, y, s, color=INK, size=12, anchor="w", bold=False):
+        k = self.k
+        a = {"w": "lm", "e": "rm", "c": "mm"}[anchor]
+        self.d.text((x * k, y * k), s, fill=color, anchor=a,
+                    font=self._font(size, bold, has_cjk(s)))
+
+    def image(self, x, y, w, h, img):
+        k = self.k
+        self.im.paste(img.resize((int(w * k), int(h * k))), (int(x * k), int(y * k)))
+
+
+# ── 장면 그리기(두 백엔드 공통) ──────────────────────────────────────
+def dashed_v(be, x, y1, y2, color=EDGELINE, width=1, on=4, off=4):
+    """세로 점선. PNG 로 내보내도 같은 모양이 되도록 토막으로 긋습니다."""
+    y = y1
+    while y < y2:
+        be.line(x, y, x, min(y + on, y2), color=color, width=width)
+        y += on + off
+
+
+def draw_scene(be, st, tk_img=None, with_cursor=True, preview=None):
+    st.invalidate()                     # 늘 지금 값으로 다시 풉니다
+    be.rect(0, 0, st.total_w, st.total_h, fill=PAPER)
+
+    if st.img is not None:
+        w, h = st.img_box()
+        be.image(PAD, PAD, w, h, tk_img if tk_img is not None else st.img)
+
+    cx, cw = st.chart_x, st.cellw
+    top, ch = st.chart_top, st.chart_h
+
+    if st.show_grid:
+        spans = [(st.row_top(idx[0]) - 6, st.row_top(idx[-1]) + ROW - 6)
+                 for _nm, idx in st.blocks()] or [(top - 8, top + ch + 6)]
+        spans[0] = (min(spans[0][0], top - 8), spans[0][1])
+        spans[-1] = (spans[-1][0], max(spans[-1][1], top + ch + 6))
+        for i in range(st.steps + 1):
+            x = cx + i * cw
+            col = GRID_MAJOR if i % 5 == 0 else GRID
+            for y1, y2 in spans:
+                be.line(x, y1, x, y2, color=col)
+
+    tops, heads, _ = st.layout()
+    for nm, y in heads:                    # 회로 제목과 가르는 줄
+        be.line(cx - GUT + 6, y + GROUP_H - 7, cx + st.chart_w,
+                y + GROUP_H - 7, color=LINE)
+        be.text(cx - GUT + 6, y + 8, nm, color=ACCENT, size=11, anchor="w",
+                bold=True)
+
+    for nm, idx in st.blocks():            # 회로마다 제 클럭으로 에지 점선
+        if not st.edge_line or not idx:
+            break
+        ck = next((st.signals[r] for r in idx
+                   if st.signals[r].get("type") == "clk"), None)
+        if ck is None:
+            ck = st.clock_of(st.signals[idx[0]])
+        y1 = tops[idx[0]] - 6
+        y2 = tops[idx[-1]] + ROW - 6
+        for i in st.clock_edges(ck=ck):
+            dashed_v(be, cx + i * cw, y1, y2)
+
+    # 노드
+    for r, sig in enumerate(st.signals):
+        ym = st.y_mid(r)
+        y_hi, y_lo = ym - AMP, ym + AMP
+        nm = sig["name"]
+        ns = 12 if len(nm) <= 11 else (10 if len(nm) <= 14 else 9)   # 긴 이름도 여백 안에
+        be.text(cx - 34, ym, nm, color=INK, size=ns, anchor="e", bold=True)
+        if sig.get("type") == "seq":          # 값을 집는 에지 자리
+            up = sig.get("edge", "rise") == "rise"
+            ytop = st.row_top(r) + 4
+            for i in range(1, st.steps):
+                if not st.edge_at(sig, i):
+                    continue
+                x = cx + i * cw
+                be.polygon([(x, ytop), (x - 4, ytop + 7), (x + 4, ytop + 7)] if up
+                           else [(x - 4, ytop), (x + 4, ytop), (x, ytop + 7)],
+                           fill=EDGEMARK)
+
+        if sig.get("type") in ("eq", "seq") and (sig.get("expr") or "").strip():
+            ex = sig["expr"].strip()
+            if len(ex) > 11:                  # 왼쪽 여백 안에 들어오게
+                ex = ex[:10] + "…"
+            mark = "=" if sig["type"] == "eq" else (
+                "↑=" if sig.get("edge", "rise") == "rise" else "↓=")
+            be.text(cx - 34, ym + 14, "%s %s" % (mark, ex),
+                    color=MUTED, size=9, anchor="e")
+
+        pts = []
+        y_prev = y_lo if st.val(sig, 0) == 0 else y_hi
+        pts.append((cx, y_prev))
+        for i in range(1, st.steps):
+            y_cur = y_lo if st.val(sig, i) == 0 else y_hi
+            if y_cur != y_prev:
+                x = cx + i * cw
+                pts.append((x, y_prev))
+                pts.append((x, y_cur))
+                y_prev = y_cur
+        pts.append((cx + st.chart_w, y_prev))
+        be.path(pts, color=INK, width=2)
+
+        if st.show_values:
+            fs = 9 if st.cellw < 22 else 10
+            yv = st.row_top(r) + ROW - 7          # 파형 아래쪽 줄에 가지런히 표시
+            for i in range(st.steps):
+                txt = st.cell_text(sig, i)
+                be.text(cx + (i + 0.5) * cw, yv, txt,
+                        color=UNKNOWN if txt == "?" else VALUE,
+                        size=fs, anchor="c", bold=True)
+
+        for lb in sig["labels"]:
+            mx = cx + ((lb["s"] + lb["e"] + 1) / 2) * cw
+            be.text(mx, ym, lb["text"], color=INK, size=11, anchor="c")
+
+    # 시간축
+    be.line(cx, top + ch + 6, cx + st.chart_w, top + ch + 6, color=LINE)
+    te = st.tick_every()
+    for i in range(st.steps + 1):
+        if i % te and i != st.steps:
+            continue
+        x = cx + i * cw
+        be.line(x, top + ch + 6, x, top + ch + 11, color=GRID_MAJOR)
+        be.text(x, top + ch + 20, str(i), color=MUTED, size=9, anchor="c")
+    if st.unit:
+        be.text(cx + st.chart_w + 10, top + ch + 20, "[%s]" % st.unit,
+                color=MUTED, size=9, anchor="w")
+
+    if preview:
+        r, s, e = preview
+        be.rect(cx + s * cw, st.row_top(r) + 10, cx + (e + 1) * cw,
+                st.row_top(r) + ROW - 10, outline=ACCENT, dash=(4, 3))
+
+
+# ── 줄 손잡이 / 선택 표시(화면 전용, PNG에는 안 들어갑니다) ─────────
+HANDLE_X, HANDLE_W, HANDLE_H = 14, 15, 13
+
+
+def handle_boxes(st, r):
+    """그 줄의 (▲상자, ▼상자) 좌표."""
+    ym = st.y_mid(r)
+    x1, x2 = HANDLE_X - HANDLE_W / 2, HANDLE_X + HANDLE_W / 2
+    return ((x1, ym - 2 - HANDLE_H, x2, ym - 2),
+            (x1, ym + 2, x2, ym + 2 + HANDLE_H))
+
+
+def in_box(box, x, y):
+    x1, y1, x2, y2 = box
+    return x1 <= x <= x2 and y1 <= y <= y2
+
+
+def draw_row_tools(be, st, sel=None, hot=None):
+    """고른 줄 표시와 ▲▼ 손잡이를 그립니다."""
+    last = len(st.signals) - 1
+    if sel is not None and 0 <= sel <= last:
+        be.rect(2, st.row_top(sel) + 6, 5, st.row_top(sel) + ROW - 6,
+                fill=ACCENT, outline="")
+    for r in sorted({q for q in (sel, hot) if q is not None and 0 <= q <= last}):
+        for box, d in zip(handle_boxes(st, r), (-1, 1)):
+            x1, y1, x2, y2 = box
+            be.rect(x1, y1, x2, y2, fill=PAPER, outline=LINE)
+            xm, g = (x1 + x2) / 2, 3.5
+            pts = ([(xm, y1 + g), (x1 + g, y2 - g), (x2 - g, y2 - g)] if d < 0
+                   else [(x1 + g, y1 + g), (x2 - g, y1 + g), (xm, y2 - g)])
+            be.polygon(pts, fill=ACCENT if 0 <= r + d <= last else LINE)
+
+
+def draw_cursor(be, st):
+    if st.cursor is None:
+        return
+    cx, cw = st.chart_x, st.cellw
+    x = cx + st.cursor * cw
+    be.line(x, st.chart_top - 16, x, st.chart_top + st.chart_h + 6,
+            color=ACCENT, dash=(3, 3))
+    be.line(x + cw, st.chart_top - 8, x + cw, st.chart_top + st.chart_h + 6,
+            color=ACCENT, dash=(3, 3))
+    be.text(x + 4, st.chart_top - 22, "t=%d" % st.cursor, color=ACCENT, size=10, bold=True)
+    for r, sig in enumerate(st.signals):
+        txt = st.cell_text(sig, st.cursor)
+        txt = {"0": "L", "1": "H"}.get(txt, txt)
+        be.text(cx - 12, st.y_mid(r), txt,
+                color=UNKNOWN if txt == "?" else ACCENT,
+                size=11, anchor="e", bold=True)
+
+
+# ── 노드에서 뽑아낸 상태 기계 ────────────────────────────────────────
+class FsmError(Exception):
+    pass
+
+
+class Fsm:
+    """타이밍 노드를 그대로 읽어 상태 기계로 봅니다.
+
+    순차식 노드 = 상태 변수, 그 식에 쓰인 신호 노드 = 입력,
+    조합식 노드 = 출력. 처음 상태는 각 순차식의 [처음값] 입니다.
+    """
+
+    def __init__(self, st, group=None):
+        self.st = st
+        self.group = group
+        sigs = [g for g in st.signals
+                if group is None or g.get("group", "") == group]
+        self.sigs = sigs
+        self.S = [g for g in sigs if g.get("type") == "seq"]
+        self.O = [g for g in sigs if g.get("type") == "eq"]
+        if not self.S:
+            raise FsmError("순차식 노드가 없습니다 — 상태 변수를 만들어 주세요")
+        if len(self.S) > 6:
+            raise FsmError("상태 변수는 6개까지입니다 (지금 %d개)" % len(self.S))
+
+        self.trees = {}
+        for g in self.S + self.O:
+            tree, err = st.ast_of(g)
+            if tree is None:
+                raise FsmError("%s%s 의 식을 읽을 수 없습니다: %s"
+                               % ("[%s] " % group if group else "", g["name"], err))
+            self.trees[g["name"]] = tree
+
+        used = set()
+        for t in self.trees.values():
+            used |= used_names(t)
+        self.X = [g for g in sigs
+                  if g.get("type") == "sig" and g["name"] in used]
+        if len(self.X) > 5:
+            raise FsmError("입력은 5개까지입니다 (지금 %d개)" % len(self.X))
+
+        self.snames = [g["name"] for g in self.S]
+        self.xnames = [g["name"] for g in self.X]
+        self.onames = [g["name"] for g in self.O]
+        miss = sorted(used - set(self.snames) - set(self.xnames) - set(self.onames))
+        if miss:
+            raise FsmError("%s 안에 %s 이(가) 없습니다"
+                           % ("[%s]" % group if group else "이 회로",
+                              ", ".join(miss)))
+
+        self.n, self.m = len(self.S), len(self.X)
+        self.states = [tuple(b) for b in itertools.product((0, 1), repeat=self.n)]
+        self.ins = ([tuple(b) for b in itertools.product((0, 1), repeat=self.m)]
+                    if self.m else [()])
+        self.mealy = any(used_names(self.trees[nm]) & set(self.xnames)
+                         for nm in self.onames)
+        self.start = tuple(1 if g.get("init") else 0 for g in self.S)
+        self.rows = self._build()
+        self.reach = self._reachable()
+
+    # ── 계산 ──
+    def _look(self, nm, env, seen=()):
+        if nm in env:
+            return env[nm]
+        if nm in self.trees and nm not in seen:        # 조합식은 풀어서 씁니다
+            return ev3(self.trees[nm],
+                       lambda k: self._look(k, env, seen + (nm,)))
+        return None
+
+    def _val(self, nm, env):
+        v = ev3(self.trees[nm], lambda k: self._look(k, env))
+        if v is None:
+            raise FsmError("%s 의 값을 정할 수 없습니다 (식을 확인해 주세요)" % nm)
+        return v
+
+    def env_of(self, cur, xi):
+        e = dict(zip(self.snames, cur))
+        e.update(zip(self.xnames, xi))
+        return e
+
+    def next_of(self, cur, xi):
+        e = self.env_of(cur, xi)
+        return tuple(self._val(nm, e) for nm in self.snames)
+
+    def out_of(self, cur, xi):
+        e = self.env_of(cur, xi)
+        return [(nm, self._val(nm, e)) for nm in self.onames]
+
+    def _build(self):
+        return [dict(cur=c, x=xi, nxt=self.next_of(c, xi), out=self.out_of(c, xi))
+                for c in self.states for xi in self.ins]
+
+    def _reachable(self):
+        seen, stack = {self.start}, [self.start]
+        while stack:
+            cur = stack.pop()
+            for xi in self.ins:
+                nx = self.next_of(cur, xi)
+                if nx not in seen:
+                    seen.add(nx)
+                    stack.append(nx)
+        return seen
+
+    # ── 표시 ──
+    def sname(self, stt):
+        return "".join(str(b) for b in stt)
+
+    def out_str(self, outs):
+        return "".join(str(v) for _, v in outs)
+
+    def edges(self):
+        agg = {}
+        for r in self.rows:
+            xs = "".join(str(b) for b in r["x"]) if r["x"] else ""
+            lab = "%s/%s" % (xs, self.out_str(r["out"])) if self.mealy else xs
+            agg.setdefault((r["cur"], r["nxt"]), []).append(lab)
+        return agg
+
+    def node_label(self, stt):
+        if self.mealy or not self.O:
+            return self.sname(stt)
+        return "%s/%s" % (self.sname(stt), self.out_str(self.out_of(stt, self.ins[0])))
+
+    def summary(self):
+        un = len(self.states) - len(self.reach)
+        return "%s상태 %d개(%s) · 입력 %s · %s%s" % (
+            "[%s] " % self.group if self.group else "",
+            len(self.states), " ".join(self.snames),
+            " ".join(self.xnames) or "없음",
+            "Mealy" if self.mealy else "Moore",
+            " · 갈 수 없는 상태 %d개" % un if un else "")
+
+    def table_text(self):
+        """교과서 꼴 상태표: 상태마다 한 줄, 입력은 열로 펼칩니다.
+
+                 \u2502   A\u207aB\u207aC\u207a   \u2502     Z
+          ABC    \u2502 X=0    X=1  \u2502 X=0   X=1
+         \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+          000    \u2502 011    010  \u2502  1     0
+        """
+        ins = self.ins
+
+        def xhead(xi):
+            if not self.xnames:
+                return ""
+            return "%s=%s" % ("".join(self.xnames), "".join(str(b) for b in xi))
+
+        def pack(title, cols):
+            """입력을 바꿔도 값이 같으면 한 칸으로 합칩니다(Moore 출력 등)."""
+            if len(cols) > 1 and all(q == cols[0] for q in cols[1:]):
+                return title, [cols[0]], [""]
+            return title, cols, [xhead(xi) for xi in ins]
+
+        # 그룹: 다음 상태 하나 + 출력마다 하나. 그룹 안에서 입력 조합마다 한 열.
+        groups = [pack("".join(nm + "\u207a" for nm in self.snames),
+                       [[self.sname(self.next_of(c, xi)) for c in self.states]
+                        for xi in ins])]
+        for k, nm in enumerate(self.onames):
+            groups.append(pack(nm, [[str(self.out_of(c, xi)[k][1])
+                                     for c in self.states] for xi in ins]))
+
+        left = "".join(self.snames)
+        col0 = [self.sname(c) for c in self.states]
+        w0 = max([len(left)] + [len(v) for v in col0]) + 2
+        gw = [[max([len(labs[j])] + [len(v) for v in cols[j]]) + 2
+               for j in range(len(cols))] for _, cols, labs in groups]
+        full = [sum(w) + len(w) - 1 for w in gw]
+
+        def join(c0, cells):
+            return "\u2502".join([c0.center(w0)] +
+                                 [" ".join(cells[i][j].center(gw[i][j])
+                                           for j in range(len(gw[i])))
+                                  for i in range(len(groups))])
+
+        lines = ["\u2502".join([" " * w0] +
+                               [t.center(full[i])
+                                for i, (t, _, _) in enumerate(groups)]),
+                 join(left, [labs for _, _, labs in groups]),
+                 "\u253c".join(["\u2500" * w0] +
+                               ["\u2500" * full[i] for i in range(len(groups))])]
+        for r in range(len(self.states)):
+            lines.append(join(col0[r], [[cols[j][r] for j in range(len(cols))]
+                                        for _, cols, _ in groups]))
+
+        un = [self.sname(q) for q in self.states if q not in self.reach]
+        return "\n".join(lines + [
+            "",
+            "형식: " + ("Mealy (출력이 입력에 따라 바뀜)" if self.mealy
+                        else "Moore (출력이 상태에만 달림)"),
+            "처음 상태: " + self.sname(self.start),
+            "갈 수 없는 상태: " + (", ".join(un) if un else "없음")])
+
+
+# ── 상태 천이도 그리기 ───────────────────────────────────────────────
+def qbez(p0, p1, p2, n=26):
+    return [((1 - t) ** 2 * p0[0] + 2 * (1 - t) * t * p1[0] + t * t * p2[0],
+             (1 - t) ** 2 * p0[1] + 2 * (1 - t) * t * p1[1] + t * t * p2[1])
+            for t in (i / n for i in range(n + 1))]
+
+
+def cbez(p0, p1, p2, p3, n=30):
+    out = []
+    for i in range(n + 1):
+        t = i / n
+        u = 1 - t
+        out.append((u ** 3 * p0[0] + 3 * u * u * t * p1[0]
+                    + 3 * u * t * t * p2[0] + t ** 3 * p3[0],
+                    u ** 3 * p0[1] + 3 * u * u * t * p1[1]
+                    + 3 * u * t * t * p2[1] + t ** 3 * p3[1]))
+    return out
+
+
+def arrow_head(pts, size=9):
+    (x1, y1), (x2, y2) = pts[-2], pts[-1]
+    a = math.atan2(y2 - y1, x2 - x1)
+    return [(x2, y2),
+            (x2 - size * math.cos(a - 0.42), y2 - size * math.sin(a - 0.42)),
+            (x2 - size * math.cos(a + 0.42), y2 - size * math.sin(a + 0.42))]
+
+
+def graph_size(fsm):
+    r = max(120, len(fsm.states) * 2.9 * NODE_R / (2 * math.pi))
+    q = int(2 * (r + NODE_R + 70))
+    return max(640, q), max(520, q)
+
+
+def graph_layout(fsm, W, H):
+    n = len(fsm.states)
+    cx, cy = W / 2, H / 2
+    if n == 1:
+        return {fsm.states[0]: (cx, cy)}
+    R = min(max(120, n * 2.9 * NODE_R / (2 * math.pi)),
+            min(W, H) / 2 - NODE_R - 62)
+    return {q: (cx + R * math.cos(-math.pi / 2 + 2 * math.pi * i / n),
+                cy + R * math.sin(-math.pi / 2 + 2 * math.pi * i / n))
+            for i, q in enumerate(fsm.states)}
+
+
+def draw_graph(be, fsm, W, H, title="", subtitle=""):
+    be.rect(0, 0, W, H, fill=PAPER)
+    pos = graph_layout(fsm, W, H)
+    if title:
+        be.text(W / 2, 24, title, color=INK, size=13, anchor="c", bold=True)
+    if subtitle:
+        be.text(W / 2, 46, subtitle, color=MUTED, size=10, anchor="c")
+    be.text(W / 2, H - 18,
+            "Mealy \u00b7 화살표 = 입력/출력" if fsm.mealy
+            else "Moore \u00b7 원 안 = 상태/출력",
+            color=MUTED, size=10, anchor="c")
+
+    cx, cy = W / 2, H / 2
+    for (a, b), labs in fsm.edges().items():
+        lab = ", ".join(sorted(set(labs)))
+        q0, q1 = pos[a], pos[b]
+        if a == b:                                   # 제자리로 돌아오는 화살표
+            ang = (math.atan2(q0[1] - cy, q0[0] - cx) if len(pos) > 1
+                   else -math.pi / 2)
+            s1 = (q0[0] + NODE_R * math.cos(ang - 0.5),
+                  q0[1] + NODE_R * math.sin(ang - 0.5))
+            s2 = (q0[0] + NODE_R * math.cos(ang + 0.5),
+                  q0[1] + NODE_R * math.sin(ang + 0.5))
+            c1 = (q0[0] + 2.9 * NODE_R * math.cos(ang - 0.55),
+                  q0[1] + 2.9 * NODE_R * math.sin(ang - 0.55))
+            c2 = (q0[0] + 2.9 * NODE_R * math.cos(ang + 0.55),
+                  q0[1] + 2.9 * NODE_R * math.sin(ang + 0.55))
+            pts = cbez(s1, c1, c2, s2)
+            lx = q0[0] + 2.6 * NODE_R * math.cos(ang)
+            ly = q0[1] + 2.6 * NODE_R * math.sin(ang)
+        else:
+            dx, dy = q1[0] - q0[0], q1[1] - q0[1]
+            d = math.hypot(dx, dy) or 1
+            ux, uy = dx / d, dy / d
+            off = 0.18 * d
+            mid = ((q0[0] + q1[0]) / 2 - uy * off, (q0[1] + q1[1]) / 2 + ux * off)
+            dp = math.hypot(mid[0] - q0[0], mid[1] - q0[1]) or 1
+            e0 = (q0[0] + NODE_R * (mid[0] - q0[0]) / dp,
+                  q0[1] + NODE_R * (mid[1] - q0[1]) / dp)
+            dq = math.hypot(mid[0] - q1[0], mid[1] - q1[1]) or 1
+            e1 = (q1[0] + NODE_R * (mid[0] - q1[0]) / dq,
+                  q1[1] + NODE_R * (mid[1] - q1[1]) / dq)
+            pts = qbez(e0, mid, e1)
+            lx = (e0[0] + 2 * mid[0] + e1[0]) / 4
+            ly = (e0[1] + 2 * mid[1] + e1[1]) / 4
+
+        dim = a not in fsm.reach
+        be.polyline(pts, color=GHOST if dim else INK, width=1.6)
+        be.polygon(arrow_head(pts), fill=GHOST if dim else INK)
+        if lab:
+            w = 6.8 * len(lab) + 8
+            be.rect(lx - w / 2, ly - 9, lx + w / 2, ly + 9, fill=PAPER)
+            be.text(lx, ly, lab, color=MUTED if dim else ACCENT,
+                    size=11, anchor="c", bold=True)
+
+    for q, (x, y) in pos.items():
+        on = q in fsm.reach
+        if q == fsm.start:
+            be.polyline([(x - NODE_R - 34, y), (x - NODE_R - 6, y)],
+                        color=ACCENT, width=2)
+            be.polygon(arrow_head([(x - NODE_R - 34, y), (x - NODE_R - 5, y)]),
+                       fill=ACCENT)
+        be.ellipse(x - NODE_R, y - NODE_R, x + NODE_R, y + NODE_R,
+                   fill=SOFT if on else PAPER, outline=INK if on else GHOST,
+                   width=2, dash=None if on else (3, 3))
+        be.text(x, y, fsm.node_label(q), color=INK if on else GHOST,
+                size=12, anchor="c", bold=True)
+
+
+def render_graph_png(fsm, path, title="", subtitle="", k=2):
+    W, H = graph_size(fsm)
+    im = Image.new("RGB", (W * k, H * k), PAPER)
+    draw_graph(PilBackend(im, k), fsm, W, H, title, subtitle)
+    im.save(path)
+    return path
+
+
+# ── 앱 ───────────────────────────────────────────────────────────────
+class App(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("타이밍 다이어그램 에디터")
+        self.geometry("1160x880")
+        self.configure(bg="#E6EBF0")
+        self.st = State()
+        self.mode = tk.StringVar(value="draw")
+        self.drag = None
+        self.preview = None
+        self.tk_img = None
+        self.editor = None        # 차트 위에서 이름을 고치는 중인 입력칸
+        self.hot_row = None       # 마우스가 얹힌 줄(손잡이를 보여 줄 줄)
+        self.v_fsm_group = tk.StringVar()   # 천이도·상태표가 보여 줄 회로
+        self._fsm_cbs = []
+        self.hover_rc = (None, None)   # 마우스가 얹힌 (줄, 칸)
+        self.f_hold = False       # F 를 누르고 있는 중
+        self.f_sticky = False     # F 를 눌렀다 떼면 켜지는 F 입력 모드
+        self.f_used = False       # 누르고 있는 동안 클릭으로 썼는지
+        self.file_path = ""
+
+        self._build_toolbar()
+        self._build_canvas()
+        self._build_status()
+        self._build_panel()
+        self.refresh_list()
+        self.redraw()
+
+    # ── 툴바 ──
+    def _build_toolbar(self):
+        bar = ttk.Frame(self, padding=(10, 8))
+        bar.pack(fill="x")
+
+        ttk.Label(bar, text="전체 시간 t").pack(side="left")
+        self.v_steps = tk.IntVar(value=self.st.steps)
+        ttk.Spinbox(bar, from_=2, to=400, width=5, textvariable=self.v_steps,
+                    command=self.on_steps).pack(side="left", padx=(4, 12))
+        self.v_steps.trace_add("write", lambda *a: self.on_steps())
+
+        ttk.Label(bar, text="단위").pack(side="left")
+        self.v_unit = tk.StringVar(value="")
+        e = ttk.Entry(bar, width=5, textvariable=self.v_unit)
+        e.pack(side="left", padx=(4, 12))
+        self.v_unit.trace_add("write", lambda *a: self._set("unit", self.v_unit.get()[:6]))
+
+        ttk.Label(bar, text="칸 너비").pack(side="left")
+        self.v_w = tk.IntVar(value=self.st.cellw)
+        ttk.Scale(bar, from_=14, to=70, variable=self.v_w, length=110,
+                  command=lambda *a: self._set("cellw", int(float(self.v_w.get())))
+                  ).pack(side="left", padx=(4, 12))
+
+        ttk.Separator(bar, orient="vertical").pack(side="left", fill="y", padx=6)
+        ttk.Radiobutton(bar, text="파형 그리기", value="draw",
+                        variable=self.mode).pack(side="left")
+        ttk.Radiobutton(bar, text="구간 이름", value="label",
+                        variable=self.mode).pack(side="left", padx=(6, 12))
+
+        self.v_clk = tk.BooleanVar(value=True)
+        ttk.Checkbutton(bar, text="clk 표시", variable=self.v_clk,
+                        command=self.toggle_clock).pack(side="left")
+        self.v_grid = tk.BooleanVar(value=True)
+        ttk.Checkbutton(bar, text="격자", variable=self.v_grid,
+                        command=lambda: self._set("show_grid", self.v_grid.get())
+                        ).pack(side="left", padx=(6, 0))
+        self.v_vals = tk.BooleanVar(value=True)
+        ttk.Checkbutton(bar, text="0/1 표시", variable=self.v_vals,
+                        command=lambda: self._set("show_values", self.v_vals.get())
+                        ).pack(side="left", padx=(6, 0))
+
+        ttk.Button(bar, text="초기화", command=self.reset_all).pack(side="right", padx=(8, 0))
+        ttk.Separator(bar, orient="vertical").pack(side="right", fill="y", padx=8)
+        ttk.Button(bar, text="PNG 저장", command=self.export_png).pack(side="right")
+        ttk.Button(bar, text="열기", command=self.open_json).pack(side="right", padx=4)
+        ttk.Button(bar, text="저장", command=self.save_json).pack(side="right")
+
+        bar2 = ttk.Frame(self, padding=(10, 0, 10, 8))
+        bar2.pack(fill="x")
+        ttk.Label(bar2, text="제목").pack(side="left")
+        self.v_title = tk.StringVar(value=self.st.title)
+        ttk.Entry(bar2, width=34, textvariable=self.v_title).pack(side="left", padx=(4, 12))
+        self.v_title.trace_add("write", lambda *a: self._set("title", self.v_title.get()))
+        ttk.Button(bar2, text="회로도 넣기", command=self.pick_image).pack(side="left")
+        ttk.Button(bar2, text="회로도 빼기", command=self.clear_image).pack(side="left", padx=(4, 12))
+        ttk.Label(bar2, text="회로도 크기").pack(side="left")
+        self.v_iscale = tk.IntVar(value=self.st.img_scale)
+        ttk.Scale(bar2, from_=25, to=100, variable=self.v_iscale, length=140,
+                  command=lambda *a: self._set("img_scale", int(float(self.v_iscale.get())))
+                  ).pack(side="left", padx=4)
+        ttk.Label(bar2, text="에지선").pack(side="left", padx=(12, 0))
+        self.v_eline = tk.StringVar(value=ELINE_TEXT[0])
+        cb = ttk.Combobox(bar2, textvariable=self.v_eline, width=7,
+                          state="readonly", values=ELINE_TEXT)
+        cb.pack(side="left", padx=4)
+        cb.bind("<<ComboboxSelected>>", lambda e: self.apply_eline())
+
+        self.lbl_hint = ttk.Label(bar2, foreground=MUTED,
+                                  text="Alt+↑↓ 는 이름을 고치는 중에도 줄을 옮깁니다.")
+        self.lbl_hint.pack(side="left", padx=16)
+
+    # ── 캔버스 ──
+    def _build_canvas(self):
+        self.nb = ttk.Notebook(self)
+        self.nb.pack(fill="both", expand=True, padx=10)
+
+        wrap = ttk.Frame(self.nb)
+        self.nb.add(wrap, text="  타이밍 다이어그램  ")
+        self.canvas = tk.Canvas(wrap, bg=PAPER, highlightthickness=1,
+                                highlightbackground=LINE)
+        xs = ttk.Scrollbar(wrap, orient="horizontal", command=self.canvas.xview)
+        ys = ttk.Scrollbar(wrap, orient="vertical", command=self.canvas.yview)
+        self.canvas.configure(xscrollcommand=xs.set, yscrollcommand=ys.set)
+        self.canvas.grid(row=0, column=0, sticky="nsew")
+        ys.grid(row=0, column=1, sticky="ns")
+        xs.grid(row=1, column=0, sticky="ew")
+        wrap.rowconfigure(0, weight=1)
+        wrap.columnconfigure(0, weight=1)
+
+        self.canvas.configure(takefocus=True)
+        self.canvas.bind("<Button-1>", self.on_down)
+        self.canvas.bind("<B1-Motion>", self.on_move)
+        self.canvas.bind("<ButtonRelease-1>", self.on_up)
+        self.canvas.bind("<Motion>", self.on_hover)
+        self.canvas.bind("<Leave>", self.on_leave)
+        self.canvas.bind("<Up>", lambda e: self.move(-1))     # 고른 줄을 위로
+        self.canvas.bind("<Down>", lambda e: self.move(1))    # 아래로
+        self.bind("<Alt-Up>", lambda e: self.move(-1))        # 어디서든
+        self.bind("<Alt-Down>", lambda e: self.move(1))
+        self.bind("<KeyPress>", self.on_key_down)             # F: F(false) 넣기
+        self.bind("<KeyRelease>", self.on_key_up)
+        self.bind("<Escape>", lambda e: self.f_off())
+
+        gf = ttk.Frame(self.nb)                       # 상태 천이도 탭
+        self.nb.add(gf, text="  상태 천이도  ")
+        self._fsm_bar(gf).pack(fill="x")
+        gwrap = ttk.Frame(gf)
+        gwrap.pack(fill="both", expand=True)
+        self.gcanvas = tk.Canvas(gwrap, bg=PAPER, highlightthickness=1,
+                                 highlightbackground=LINE)
+        gx = ttk.Scrollbar(gwrap, orient="horizontal", command=self.gcanvas.xview)
+        gy = ttk.Scrollbar(gwrap, orient="vertical", command=self.gcanvas.yview)
+        self.gcanvas.configure(xscrollcommand=gx.set, yscrollcommand=gy.set)
+        self.gcanvas.grid(row=0, column=0, sticky="nsew")
+        gy.grid(row=0, column=1, sticky="ns")
+        gx.grid(row=1, column=0, sticky="ew")
+        gwrap.rowconfigure(0, weight=1)
+        gwrap.columnconfigure(0, weight=1)
+
+        tf = ttk.Frame(self.nb)                       # 상태표 탭
+        self.nb.add(tf, text="  상태표  ")
+        self._fsm_bar(tf).pack(fill="x")
+        twrap = ttk.Frame(tf)
+        twrap.pack(fill="both", expand=True)
+        self.table = tk.Text(twrap, font=(MONO, 11), wrap="none", relief="flat",
+                             bg=PAPER, fg=INK, padx=14, pady=10)
+        ty = ttk.Scrollbar(twrap, command=self.table.yview)
+        self.table.configure(yscrollcommand=ty.set)
+        self.table.pack(side="left", fill="both", expand=True)
+        ty.pack(side="right", fill="y")
+
+        self.nb.bind("<<NotebookTabChanged>>", lambda e: self.refresh_fsm())
+
+    # ── 상태 천이도 / 상태표 ──
+    def _fsm_bar(self, parent):
+        """어느 회로를 보여 줄지 고르는 줄."""
+        bar = ttk.Frame(parent, padding=(10, 6, 10, 2))
+        ttk.Label(bar, text="회로").pack(side="left")
+        cb = ttk.Combobox(bar, textvariable=self.v_fsm_group, width=16,
+                          state="readonly", font=(MONO, 9))
+        cb.pack(side="left", padx=6)
+        cb.bind("<<ComboboxSelected>>", lambda e: self.refresh_fsm())
+        self._fsm_cbs.append(cb)
+        return bar
+
+    NO_GROUP = "(회로 나눔 없음)"
+
+    def fsm_group(self):
+        g = self.v_fsm_group.get()
+        return "" if g in ("", self.NO_GROUP) else g
+
+    def sync_fsm_groups(self, want=None):
+        """고를 수 있는 회로 목록을 맞춰 둡니다."""
+        show = [g or self.NO_GROUP for g in self.st.group_names()]
+        for cb in self._fsm_cbs:
+            cb.configure(values=show)
+        if want is not None:
+            want = want or self.NO_GROUP
+        cur = want if want in show else self.v_fsm_group.get()
+        if cur not in show:
+            cur = show[0] if show else ""
+        if cur != self.v_fsm_group.get():
+            self.v_fsm_group.set(cur)
+
+    def tab(self):
+        try:
+            return self.nb.index(self.nb.select())
+        except Exception:
+            return 0
+
+    def build_fsm(self):
+        """고른 회로로 상태 기계를 만듭니다. 안 되면 (None, 까닭)."""
+        try:
+            return Fsm(self.st, self.fsm_group()), ""
+        except FsmError as ex:
+            return None, str(ex)
+        except Exception as ex:
+            return None, "상태 기계를 만들지 못했습니다: %s" % ex
+
+    def refresh_fsm(self):
+        """탭이 열려 있을 때만 천이도·상태표를 다시 만듭니다."""
+        if self.tab() == 0 or not hasattr(self, "table"):
+            return
+        self.sync_fsm_groups()
+        self.gcanvas.delete("all")
+        self.table.delete("1.0", "end")
+        self.fsm, err = self.build_fsm()
+        if self.fsm is None:
+            self.gcanvas.create_text(24, 24, text="⚠ %s" % err, anchor="nw",
+                                     fill=UNKNOWN, font=(MONO, 11))
+            self.table.insert("1.0", "⚠ %s\n\n%s" % (err, FSM_HELP))
+            return
+        w, h = graph_size(self.fsm)
+        draw_graph(TkBackend(self.gcanvas), self.fsm, w, h,
+                   self.st.title, self.fsm.summary())
+        self.gcanvas.configure(scrollregion=(0, 0, w, h))
+        self.table.insert("1.0", self.fsm.table_text())
+
+    # ── 단축키 안내줄 ──
+    def _build_status(self):
+        box = ttk.Frame(self, padding=(12, 4))
+        box.pack(fill="x", padx=10, pady=(4, 0))
+        self.lbl_keys = ttk.Label(box, font=(MONO, 9), foreground=MUTED,
+                                  text=KEY_HINT)
+        self.lbl_keys.pack(anchor="w")
+        ttk.Label(box, font=(MONO, 9), foreground=MUTED,
+                  text=EQ_HINT).pack(anchor="w")
+
+    def show_keys(self):
+        if self.f_on():
+            self.lbl_keys.configure(text=KEY_HINT_F, foreground=ACCENT)
+        else:
+            self.lbl_keys.configure(text=KEY_HINT, foreground=MUTED)
+
+    # ── F 키 ──
+    def _is_typing(self):
+        """글자를 넣는 칸에 커서가 있으면 F 를 단축키로 쓰지 않습니다."""
+        return isinstance(self.focus_get(), (tk.Entry, tk.Spinbox, tk.Text))
+
+    def f_on(self):
+        """지금 클릭하면 F 가 들어가는 상태인지."""
+        return self.f_hold or self.f_sticky
+
+    def _is_f(self, ev):
+        """자판이 한글이어도 F 키를 알아봅니다."""
+        return (ev.keysym or "").lower() == "f" or ev.keycode == 70
+
+    def on_key_down(self, ev):
+        if not self._is_f(ev) or self._is_typing():
+            return
+        self.f_hold = True
+        self.show_keys()
+
+    def on_key_up(self, ev):
+        if not self._is_f(ev) or self._is_typing():
+            return
+        self.f_hold = False
+        if not self.f_used:          # 누른 채 찍지 않았으면 모드를 켜고 끕니다
+            self.f_sticky = not self.f_sticky
+        self.f_used = False
+        self.show_keys()
+
+    def f_off(self):
+        if self.f_sticky or self.f_hold:
+            self.f_sticky = self.f_hold = False
+            self.show_keys()
+
+    # ── 노드 패널 ──
+    def _build_panel(self):
+        p = ttk.Frame(self, padding=10)
+        p.pack(fill="x")
+
+        left = ttk.Frame(p)
+        left.pack(side="left", fill="y")
+        self.rowmap = []          # 목록 줄 -> 노드 번호(회로 제목 줄은 None)
+        ttk.Label(left, text="노드").pack(anchor="w")
+        wrap = ttk.Frame(left)
+        wrap.pack(fill="both", expand=True)
+        self.listbox = tk.Listbox(wrap, height=12, width=26, exportselection=False,
+                                  font=(MONO, 10), activestyle="none",
+                                  highlightthickness=1, highlightbackground=LINE)
+        lsb = ttk.Scrollbar(wrap, command=self.listbox.yview)
+        self.listbox.configure(yscrollcommand=lsb.set)
+        self.listbox.pack(side="left", fill="both", expand=True)
+        lsb.pack(side="right", fill="y")
+        self.listbox.bind("<<ListboxSelect>>", lambda e: self.on_list_pick())
+
+        btns = ttk.Frame(left)
+        btns.pack(fill="x", pady=4)
+        ttk.Button(btns, text="추가", width=6, command=self.add_node).pack(side="left")
+        ttk.Button(btns, text="↑", width=3, command=lambda: self.move(-1)).pack(side="left", padx=2)
+        ttk.Button(btns, text="↓", width=3, command=lambda: self.move(1)).pack(side="left")
+        ttk.Button(btns, text="삭제", width=6, command=self.del_node).pack(side="left", padx=2)
+
+        form = ttk.Frame(p, padding=(16, 0))
+        form.pack(side="left", fill="both", expand=True)
+
+        r1 = ttk.Frame(form); r1.pack(fill="x", pady=3)
+        ttk.Label(r1, text="이름", width=6).pack(side="left")
+        self.v_name = tk.StringVar()
+        ttk.Entry(r1, textvariable=self.v_name, width=18).pack(side="left")
+        ttk.Button(r1, text="이름 적용", command=self.apply_name).pack(side="left", padx=6)
+        ttk.Label(r1, text="회로").pack(side="left", padx=(14, 4))
+        self.v_group = tk.StringVar()
+        self.cb_group = ttk.Combobox(r1, textvariable=self.v_group, width=12)
+        self.cb_group.pack(side="left")
+        self.cb_group.bind("<Return>", lambda e: self.apply_group())
+        self.cb_group.bind("<<ComboboxSelected>>", lambda e: self.apply_group())
+        ttk.Button(r1, text="회로 적용",
+                   command=self.apply_group).pack(side="left", padx=6)
+
+        r2 = ttk.Frame(form); r2.pack(fill="x", pady=3)
+        ttk.Label(r2, text="종류", width=6).pack(side="left")
+        self.v_type = tk.StringVar(value="sig")
+        ttk.Radiobutton(r2, text="신호", value="sig", variable=self.v_type,
+                        command=self.apply_type).pack(side="left")
+        ttk.Radiobutton(r2, text="클럭", value="clk", variable=self.v_type,
+                        command=self.apply_type).pack(side="left", padx=6)
+        ttk.Radiobutton(r2, text="조합식", value="eq", variable=self.v_type,
+                        command=self.apply_type).pack(side="left", padx=(0, 4))
+        ttk.Radiobutton(r2, text="순차식", value="seq", variable=self.v_type,
+                        command=self.apply_type).pack(side="left", padx=(0, 18))
+        ttk.Label(r2, text="클럭 주기").pack(side="left")
+        self.v_period = tk.IntVar(value=2)
+        ttk.Spinbox(r2, from_=2, to=40, width=4, textvariable=self.v_period,
+                    command=self.apply_period).pack(side="left", padx=4)
+        ttk.Label(r2, text="위상").pack(side="left", padx=(8, 0))
+        self.v_phase = tk.IntVar(value=0)
+        ttk.Spinbox(r2, from_=0, to=39, width=4, textvariable=self.v_phase,
+                    command=self.apply_phase).pack(side="left", padx=4)
+        self.v_inv = tk.BooleanVar()
+        ttk.Checkbutton(r2, text="반전", variable=self.v_inv,
+                        command=self.apply_inv).pack(side="left")
+
+        r25 = ttk.Frame(form); r25.pack(fill="x", pady=3)
+        ttk.Label(r25, text="상태식", width=6).pack(side="left")
+        self.v_expr = tk.StringVar()
+        self.e_expr = ttk.Entry(r25, textvariable=self.v_expr, width=28,
+                                font=(MONO, 10))
+        self.e_expr.pack(side="left")
+        self.e_expr.bind("<Return>", lambda e: self.apply_expr())
+        ttk.Button(r25, text="식 적용", command=self.apply_expr).pack(side="left", padx=6)
+        self.lbl_eq = ttk.Label(r25, foreground=MUTED, font=(MONO, 9),
+                                text="")
+        self.lbl_eq.pack(side="left", padx=10)
+
+        r26 = ttk.Frame(form); r26.pack(fill="x", pady=3)
+        ttk.Label(r26, text="순차", width=6).pack(side="left")
+        ttk.Label(r26, text="클럭").pack(side="left")
+        self.v_src = tk.StringVar()
+        self.cb_src = ttk.Combobox(r26, textvariable=self.v_src, width=10,
+                                   state="readonly", font=(MONO, 9))
+        self.cb_src.pack(side="left", padx=(4, 12))
+        self.cb_src.bind("<<ComboboxSelected>>", lambda e: self.apply_seq())
+        ttk.Label(r26, text="에지").pack(side="left")
+        self.v_edge = tk.StringVar(value="rise")
+        ttk.Radiobutton(r26, text="↑ 상승", value="rise", variable=self.v_edge,
+                        command=self.apply_seq).pack(side="left", padx=4)
+        ttk.Radiobutton(r26, text="↓ 하강", value="fall", variable=self.v_edge,
+                        command=self.apply_seq).pack(side="left", padx=(0, 12))
+        ttk.Label(r26, text="처음값").pack(side="left")
+        self.v_init = tk.IntVar(value=0)
+        ttk.Radiobutton(r26, text="0", value=0, variable=self.v_init,
+                        command=self.apply_seq).pack(side="left", padx=4)
+        ttk.Radiobutton(r26, text="1", value=1, variable=self.v_init,
+                        command=self.apply_seq).pack(side="left")
+
+        r3 = ttk.Frame(form); r3.pack(fill="x", pady=3)
+        ttk.Label(r3, text="채우기", width=6).pack(side="left")
+        ttk.Button(r3, text="전부 L", command=lambda: self.fill(0)).pack(side="left")
+        ttk.Button(r3, text="전부 H", command=lambda: self.fill(1)).pack(side="left", padx=4)
+        ttk.Button(r3, text="반전", command=self.invert).pack(side="left")
+        ttk.Button(r3, text="구간 이름 지우기", command=self.clear_labels).pack(side="left", padx=12)
+        ttk.Button(r3, text="예제로 되돌리기", command=self.reset).pack(side="right")
+        ttk.Button(r3, text="순차 회로 예제",
+                   command=self.reset_seq).pack(side="right", padx=6)
+
+    # ── 헬퍼 ──
+    def _set(self, key, val):
+        setattr(self.st, key, val)
+        self.redraw()
+
+    def on_steps(self):
+        try:
+            v = int(self.v_steps.get())
+        except Exception:
+            return
+        self.st.steps = max(2, min(400, v))
+        for s in self.st.signals:
+            if len(s["values"]) < self.st.steps:
+                s["values"].extend([0] * (self.st.steps - len(s["values"])))
+            for lb in list(s["labels"]):
+                if lb["s"] >= self.st.steps:
+                    s["labels"].remove(lb)
+                else:
+                    lb["e"] = min(lb["e"], self.st.steps - 1)
+        self.redraw()
+
+    def sel(self):
+        s = self.listbox.curselection()
+        if not s or s[0] >= len(self.rowmap):
+            return None
+        return self.rowmap[s[0]]
+
+    def refresh_list(self, keep=None):
+        self.listbox.delete(0, "end")
+        self.rowmap = []
+        last = None
+        for i, sg in enumerate(self.st.signals):
+            g = sg.get("group", "")
+            if g != last:                       # 회로가 바뀌면 제목 줄
+                last = g
+                if g:
+                    self.listbox.insert("end", g)
+                    self.listbox.itemconfig("end", foreground=ACCENT)
+                    self.rowmap.append(None)
+            mark = {"clk": "CLK", "eq": " = ", "seq": " FF"}.get(sg["type"], "   ")
+            self.listbox.insert("end", "%s%s  %s" % ("    " if g else " ",
+                                                     mark, sg["name"]))
+            self.rowmap.append(i)
+        if self.st.signals:
+            i = 0 if keep is None else min(keep, len(self.st.signals) - 1)
+            self.pick_line(i)
+
+    def pick_line(self, node):
+        """노드 번호로 목록 줄을 고릅니다."""
+        if node is None or node not in self.rowmap:
+            return
+        line = self.rowmap.index(node)
+        self.listbox.selection_clear(0, "end")
+        self.listbox.selection_set(line)
+        self.listbox.see(line)
+        self.load_form()
+
+    def on_list_pick(self):
+        """회로 제목 줄을 누르면 그 회로의 첫 노드로 옮깁니다."""
+        cur = self.listbox.curselection()
+        if cur and self.rowmap[cur[0]] is None:
+            nxt = next((k for k in range(cur[0] + 1, len(self.rowmap))
+                        if self.rowmap[k] is not None), None)
+            if nxt is not None:
+                self.listbox.selection_clear(0, "end")
+                self.listbox.selection_set(nxt)
+        self.load_form()
+
+    def load_form(self):
+        i = self.sel()
+        if i is None:
+            return
+        s = self.st.signals[i]
+        self.v_name.set(s["name"])
+        self.v_type.set(s["type"])
+        self.v_period.set(s.get("period", 2))
+        self.v_phase.set(int(s.get("phase", 0)))
+        self.v_inv.set(bool(s.get("inv")))
+        self.v_expr.set(s.get("expr", ""))
+        self.v_group.set(s.get("group", ""))
+        self.cb_group.configure(values=[q for q in self.st.group_names() if q])
+        mine = s.get("group", "")
+        self.cb_src.configure(values=[x["name"] for x in self.st.signals
+                                      if x is not s
+                                      and x.get("group", "") == mine])
+        ck = self.st.clock_of(s) if s.get("type") == "seq" else None
+        self.v_src.set(ck["name"] if ck else s.get("clk", ""))
+        self.v_edge.set(s.get("edge", "rise"))
+        self.v_init.set(1 if s.get("init") else 0)
+        self.show_eq_status()
+        self.sync_fsm_groups(s.get("group", ""))
+        self.refresh_fsm()          # 고른 회로에 맞춰 천이도도 바꿉니다
+
+    def show_eq_status(self):
+        """식 노드의 상태(오류 / ? 안내)를 폼에 보여 줍니다."""
+        i = self.sel()
+        if i is None:
+            return
+        s = self.st.signals[i]
+        if s.get("type") not in ("eq", "seq"):
+            self.lbl_eq.configure(
+                foreground=MUTED,
+                text="식을 쓰고 [식 적용]을 누르면 조합식 노드가 됩니다")
+            return
+        msg = self.st.eq_error(s)
+        bad = msg.startswith(("모르는", "클럭", "정보가", "식이", "읽을", "예상", "알 수"))
+        self.lbl_eq.configure(foreground=(UNKNOWN if bad else ACCENT), text=msg)
+
+    def apply_seq(self):
+        i = self.sel()
+        if i is None:
+            return
+        s = self.st.signals[i]
+        s["clk"] = self.v_src.get()
+        s["edge"] = self.v_edge.get()
+        s["init"] = int(self.v_init.get())
+        self.redraw()
+        self.show_eq_status()
+
+    def apply_expr(self):
+        i = self.sel()
+        if i is None:
+            return
+        s = self.st.signals[i]
+        s["expr"] = self.v_expr.get().strip()
+        if s["type"] not in ("eq", "seq"):       # 순차식은 순차식으로 둡니다
+            if not s["expr"]:
+                return
+            s["type"] = "eq"
+            self.v_type.set("eq")
+            self.refresh_list(i)
+        self.redraw()
+        self.show_eq_status()
+
+    # ── 노드 편집 ──
+    def add_node(self):
+        n = sum(1 for s in self.st.signals if s["type"] == "sig") + 1
+        i = self.sel()
+        at = len(self.st.signals) if i is None else i + 1
+        self.st.signals.insert(at, dict(
+            name="node%d" % n, type="sig", period=2, inv=False, expr="",
+            clk="", edge="rise", init=0, group=self._group_at(i),
+            values=[0] * self.st.steps, labels=[]))
+        self.refresh_list(at)
+        self.redraw()
+
+    def _group_at(self, i):
+        return "" if i is None else self.st.signals[i].get("group", "")
+
+    def del_node(self):
+        i = self.sel()
+        if i is None or len(self.st.signals) <= 1:
+            return
+        self.st.signals.pop(i)
+        self.v_clk.set(any(s["type"] == "clk" for s in self.st.signals))
+        self.refresh_list(i)
+        self.redraw()
+
+    def move(self, d):
+        i = self.sel()
+        return None if i is None else self.move_row(i, d)
+
+    def move_row(self, i, d):
+        """i번 줄을 d칸(위 -1 / 아래 +1) 옮깁니다."""
+        j = i + d
+        if not (0 <= i < len(self.st.signals)) or not (0 <= j < len(self.st.signals)):
+            return "break"
+        self.close_editor(save=True)
+        sg = self.st.signals
+        sg[i], sg[j] = sg[j], sg[i]
+        if self.hot_row in (i, j):
+            self.hot_row = j                 # 손잡이가 옮긴 줄을 따라갑니다
+        self.refresh_list(j)
+        self.redraw()
+        return "break"
+
+    def apply_name(self):
+        i = self.sel()
+        if i is None:
+            return
+        self.st.rename(i, self.v_name.get())
+        self.refresh_list(i)
+        self.redraw()
+
+    def apply_group(self):
+        """고른 노드를 그 이름의 회로에 넣습니다(비우면 회로 나눔 없음)."""
+        i = self.sel()
+        if i is None:
+            return
+        self.st.signals[i]["group"] = self.v_group.get().strip()[:16]
+        self.refresh_list(i)
+        self.redraw()
+
+    def apply_type(self):
+        i = self.sel()
+        if i is None:
+            return
+        sig = self.st.signals[i]
+        sig["type"] = self.v_type.get()
+        if sig["type"] == "seq" and not sig.get("clk"):
+            ck = self.st.clock_of(sig)
+            sig["clk"] = ck["name"] if ck else ""
+            sig.setdefault("edge", "rise")
+            sig.setdefault("init", 0)
+        self.v_clk.set(any(s["type"] == "clk" for s in self.st.signals))
+        self.refresh_list(i)
+        self.redraw()
+        self.show_eq_status()
+
+    def apply_period(self):
+        i = self.sel()
+        if i is not None:
+            self.st.signals[i]["period"] = max(2, int(self.v_period.get()))
+            self.st.invalidate()
+            self.redraw()
+
+    def apply_eline(self):
+        self.st.edge_line = ELINE_KEY.get(self.v_eline.get(), "")
+        self.redraw()
+
+    def apply_phase(self):
+        i = self.sel()
+        if i is None:
+            return
+        try:
+            self.st.signals[i]["phase"] = max(0, int(self.v_phase.get()))
+        except Exception:
+            return
+        self.st.invalidate()
+        self.redraw()
+
+    def apply_inv(self):
+        i = self.sel()
+        if i is not None:
+            self.st.signals[i]["inv"] = self.v_inv.get()
+            self.st.invalidate()
+            self.redraw()
+
+    def fill(self, v):
+        i = self.sel()
+        if i is None:
+            return
+        if self.st.signals[i]["type"] != "sig":
+            return
+        self.st.signals[i]["values"] = [v] * self.st.steps
+        self.redraw()
+
+    def invert(self):
+        i = self.sel()
+        if i is None:
+            return
+        s = self.st.signals[i]
+        if s["type"] != "sig":
+            return
+        s["values"] = [1 - self.st.val(s, k) for k in range(self.st.steps)]
+        self.redraw()
+
+    def clear_labels(self):
+        i = self.sel()
+        if i is None:
+            return
+        self.st.signals[i]["labels"] = []
+        self.redraw()
+
+    def toggle_clock(self):
+        if self.v_clk.get():
+            if not any(s["type"] == "clk" for s in self.st.signals):
+                self.st.signals.insert(0, dict(name="clock", type="clk", period=2,
+                                               inv=False, values=[], labels=[]))
+        else:
+            self.st.signals = [s for s in self.st.signals if s["type"] != "clk"]
+            if not self.st.signals:
+                self.add_node()
+        self.refresh_list(0)
+        self.redraw()
+
+    def _sync_ui(self):
+        """상태(State)를 툴바·폼의 위젯 값에 맞춰 둡니다."""
+        self.close_editor(save=False)
+        self.v_steps.set(self.st.steps)
+        self.v_w.set(self.st.cellw)
+        self.v_title.set(self.st.title)
+        self.v_unit.set(self.st.unit)
+        self.v_iscale.set(self.st.img_scale)
+        self.v_grid.set(self.st.show_grid)
+        self.v_vals.set(self.st.show_values)
+        self.v_eline.set(next((t for t, k in ELINE_KEY.items()
+                               if k == self.st.edge_line), ELINE_TEXT[0]))
+        self.v_clk.set(any(s["type"] == "clk" for s in self.st.signals))
+        self.tk_img = None
+        self.refresh_list(0)
+        self.redraw()
+
+    def reset(self):
+        """예제 다이어그램으로 되돌립니다."""
+        self.st = State()
+        self.file_path = ""
+        self._sync_ui()
+
+    def reset_seq(self):
+        """순차 회로 예제(입력 X · 상태 A · 출력 Z/Y)를 불러옵니다."""
+        self.st = State()
+        self.st.seed_seq()
+        self.file_path = ""
+        self._sync_ui()
+
+    def reset_all(self):
+        """모든 내용을 지우고 빈 문서에서 다시 시작합니다."""
+        if not messagebox.askyesno(
+                "초기화", "지금 내용을 모두 지우고 처음부터 시작할까요?", parent=self):
+            return
+        self.st = State()
+        self.st.blank()
+        self.file_path = ""
+        self.mode.set("draw")
+        self._sync_ui()
+
+    # ── 마우스 ──
+    def locate(self, ev):
+        x = self.canvas.canvasx(ev.x)
+        y = self.canvas.canvasy(ev.y)
+        i = int((x - self.st.chart_x) // self.st.cellw)
+        r = self.st.row_at(y)
+        if not (0 <= i < self.st.steps) or r is None:
+            return None, None
+        return r, i
+
+    def gutter_row(self, ev):
+        """왼쪽 여백에서 마우스가 얹힌 줄."""
+        x = self.canvas.canvasx(ev.x)
+        y = self.canvas.canvasy(ev.y)
+        if x >= self.st.chart_x:
+            return None
+        return self.st.row_at(y)
+
+    def handle_hit(self, ev):
+        """▲▼ 손잡이를 눌렀는지 봅니다 -> (줄, 방향)."""
+        x = self.canvas.canvasx(ev.x)
+        y = self.canvas.canvasy(ev.y)
+        for r in {q for q in (self.sel(), self.hot_row) if q is not None}:
+            if not (0 <= r < len(self.st.signals)):
+                continue
+            for box, d in zip(handle_boxes(self.st, r), (-1, 1)):
+                if in_box(box, x, y):
+                    return r, d
+        return None
+
+    def select_row(self, r):
+        if r is None or self.sel() == r:
+            return
+        self.pick_line(r)
+        self.draw_tools()
+
+    def draw_tools(self):
+        self.canvas.delete("tools")
+        draw_row_tools(TkBackend(self.canvas, "tools"), self.st,
+                       sel=self.sel(), hot=self.hot_row)
+
+    def name_hit(self, ev):
+        """왼쪽 이름 글씨를 눌렀는지 봅니다. 눌렀으면 그 줄 번호."""
+        x = self.canvas.canvasx(ev.x)
+        y = self.canvas.canvasy(ev.y)
+        if not (PAD - 12 <= x < self.st.chart_x - 8):
+            return None
+        r = self.st.row_at(y)
+        if r is None:
+            return None
+        if abs(y - self.st.y_mid(r)) > 12:        # 이름 줄만(식 줄은 빼고)
+            return None
+        return r
+
+    def edit_name(self, r):
+        """차트의 이름 자리에 입력칸을 올려 그 자리에서 고칩니다."""
+        self.close_editor(save=True)
+        x2 = self.st.chart_x - 28
+        x1 = max(2, x2 - 98)
+        wx = x1 - self.canvas.canvasx(0)
+        wy = self.st.y_mid(r) - 11 - self.canvas.canvasy(0)
+        var = tk.StringVar(value=self.st.signals[r]["name"])
+        e = tk.Entry(self.canvas, textvariable=var, justify="right",
+                     font=(MONO, 11, "bold"), fg=INK, relief="solid", bd=1,
+                     highlightthickness=1, highlightbackground=ACCENT,
+                     highlightcolor=ACCENT)
+        e.place(x=wx, y=wy, width=x2 - x1, height=22)
+        e.focus_set()
+        e.select_range(0, "end")
+        e.icursor("end")
+        self.editor = (e, var, r)
+        self.f_off()                       # 이름 칸에서는 F 가 그냥 글자입니다
+        e.bind("<Return>", lambda ev: self.close_editor(save=True))
+        e.bind("<Escape>", lambda ev: self.close_editor(save=False))
+        e.bind("<FocusOut>", lambda ev: self.close_editor(save=True))
+        e.bind("<Tab>", lambda ev: self.edit_step(1))
+        e.bind("<Shift-Tab>", lambda ev: self.edit_step(-1))
+        e.bind("<Down>", lambda ev: self.edit_step(1))
+        e.bind("<Up>", lambda ev: self.edit_step(-1))
+        e.bind("<Alt-Down>", lambda ev: self.edit_move(1))
+        e.bind("<Alt-Up>", lambda ev: self.edit_move(-1))
+
+    def close_editor(self, save=True):
+        if not self.editor:
+            return "break"
+        e, var, r = self.editor
+        self.editor = None                 # FocusOut 이 다시 들어오지 않게 먼저 비웁니다
+        e.destroy()
+        if save and r < len(self.st.signals):
+            self.st.rename(r, var.get())
+        self.refresh_list(min(r, len(self.st.signals) - 1))
+        self.redraw()
+        return "break"
+
+    def edit_move(self, d):
+        """이름을 고치는 중에 그 줄을 위아래로 옮깁니다."""
+        if not self.editor:
+            return "break"
+        r = self.editor[2]
+        j = r + d
+        if not (0 <= j < len(self.st.signals)):
+            return "break"
+        self.move_row(r, d)        # 여기서 이름이 저장되고 편집칸이 닫힙니다
+        self.edit_name(j)
+        return "break"
+
+    def edit_step(self, d):
+        """Tab / 화살표로 옆 줄 이름으로 넘어갑니다."""
+        if not self.editor:
+            return "break"
+        r = (self.editor[2] + d) % len(self.st.signals)
+        self.close_editor(save=True)
+        self.edit_name(r)
+        return "break"
+
+    def set_cursor(self, i):
+        self.st.cursor = i
+        self.canvas.delete("cursor")
+        if i is not None:
+            draw_cursor(TkBackend(self.canvas, "cursor"), self.st)
+
+    def on_hover(self, ev):
+        hot = self.gutter_row(ev)
+        if hot != self.hot_row:
+            self.hot_row = hot
+            self.draw_tools()
+        r, i = self.locate(ev)
+        self.hover_rc = (r, i)
+        if self.f_on() and r is not None:
+            shape = "dotbox"
+        elif self.handle_hit(ev):
+            shape = "hand2"
+        elif self.name_hit(ev) is not None:
+            shape = "xterm"
+        else:
+            shape = ""
+        self.canvas.configure(cursor=shape)
+        if i != self.st.cursor:
+            self.set_cursor(i)
+
+    def on_leave(self, ev):
+        self.set_cursor(None)
+        self.hover_rc = (None, None)
+        if self.hot_row is not None:
+            self.hot_row = None
+            self.draw_tools()
+
+    def on_down(self, ev):
+        hit = self.handle_hit(ev)
+        if hit:
+            self.canvas.focus_set()
+            return self.move_row(*hit)
+        nr = self.name_hit(ev)
+        if nr is not None:
+            self.select_row(nr)
+            self.edit_name(nr)
+            return
+        self.close_editor(save=True)
+        self.canvas.focus_set()          # 이제 ↑↓ 키로 줄을 옮길 수 있습니다
+        r, i = self.locate(ev)
+        if r is None:
+            return
+        self.select_row(r)
+        if self.mode.get() == "draw":
+            sig = self.st.signals[r]
+            if sig["type"] != "sig":          # 클럭·상태식은 손으로 못 바꿉니다
+                return
+            if self.f_on():
+                v = FALSE
+                if self.f_hold:
+                    self.f_used = True       # 누른 채 찍었으니 모드를 켜지 않습니다
+            else:
+                v = 0 if self.st.val(sig, i) else 1
+            self.drag = ("draw", r, v)
+            self.st.set_val(r, i, v)
+            self.redraw()
+        else:
+            self.drag = ("label", r, i)
+            self.preview = (r, i, i)
+            self.redraw()
+
+    def on_move(self, ev):
+        if not self.drag:
+            return
+        r, i = self.locate(ev)
+        if i is None:
+            return
+        kind = self.drag[0]
+        if kind == "draw":
+            self.st.set_val(self.drag[1], i, self.drag[2])
+        else:
+            r0, s0 = self.drag[1], self.drag[2]
+            self.preview = (r0, min(s0, i), max(s0, i))
+        self.redraw()
+        self.set_cursor(i)
+
+    def on_up(self, ev):
+        if self.drag and self.drag[0] == "label" and self.preview:
+            r, s, e = self.preview
+            sig = self.st.signals[r]
+            hit = next((lb for lb in sig["labels"]
+                        if s == e and lb["s"] <= s <= lb["e"]), None)
+            if hit:
+                txt = simpledialog.askstring("구간 이름", "이름 (비우면 삭제):",
+                                             initialvalue=hit["text"], parent=self)
+                if txt is not None:
+                    if txt.strip():
+                        hit["text"] = txt.strip()
+                    else:
+                        sig["labels"].remove(hit)
+            else:
+                txt = simpledialog.askstring(
+                    "구간 이름", "t=%d ~ %d 구간 이름:" % (s, e), parent=self)
+                if txt and txt.strip():
+                    sig["labels"].append(dict(s=s, e=e, text=txt.strip()))
+        self.drag = None
+        self.preview = None
+        self.redraw()
+
+    # ── 이미지 ──
+    def pick_image(self):
+        types = [("이미지", "*.png *.gif *.jpg *.jpeg *.bmp")] if HAS_PIL \
+            else [("PNG / GIF", "*.png *.gif")]
+        path = filedialog.askopenfilename(title="회로도 이미지 선택", filetypes=types)
+        if not path:
+            return
+        self.load_image(path)
+
+    def load_image(self, path):
+        try:
+            if HAS_PIL:
+                self.st.img = Image.open(path).convert("RGB")
+            else:
+                self.st.img = tk.PhotoImage(file=path)
+            self.st.img_path = path
+            self.redraw()
+        except Exception as ex:
+            messagebox.showerror(
+                "이미지를 열 수 없습니다",
+                "%s\n\nPillow가 없으면 PNG와 GIF만 열립니다.\n"
+                "터미널에서 pip install pillow 를 실행해 보세요." % ex)
+
+    def clear_image(self):
+        self.st.img = None
+        self.st.img_path = ""
+        self.tk_img = None
+        self.redraw()
+
+    def _prep_tk_image(self):
+        if self.st.img is None:
+            self.tk_img = None
+            return
+        w, h = self.st.img_box()
+        if HAS_PIL:
+            self.tk_img = ImageTk.PhotoImage(self.st.img.resize((max(1, w), max(1, h))))
+        else:
+            src = self.st.img
+            f = max(1, round(src.width() / max(1, w)))
+            self.tk_img = src.subsample(f, f)
+
+    # ── 파일 ──
+    def save_json(self):
+        p = filedialog.asksaveasfilename(defaultextension=".json",
+                                         filetypes=[("타이밍 파일", "*.json")])
+        if not p:
+            return
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(self.st.to_dict(), f, ensure_ascii=False, indent=1)
+        self.file_path = p
+
+    def open_json(self):
+        p = filedialog.askopenfilename(filetypes=[("타이밍 파일", "*.json")])
+        if not p:
+            return
+        with open(p, encoding="utf-8") as f:
+            self.st.from_dict(json.load(f))
+        self.st.img = None
+        if self.st.img_path and os.path.exists(self.st.img_path):
+            self.load_image(self.st.img_path)
+        self.file_path = p
+        self._sync_ui()
+
+    def export_png(self):
+        if self.tab() == 2:
+            return self.export_table()
+        if not HAS_PIL:
+            messagebox.showinfo(
+                "Pillow가 필요합니다",
+                "PNG로 저장하려면 Pillow를 설치해 주세요.\n\n    pip install pillow")
+            return
+        graph = self.tab() == 1
+        if graph:
+            fsm, err = self.build_fsm()
+            if fsm is None:
+                messagebox.showerror("상태 천이도를 만들 수 없습니다", err)
+                return
+        base = (self.st.title or "timing").replace(" ", "_")
+        p = filedialog.asksaveasfilename(
+            defaultextension=".png", filetypes=[("PNG 이미지", "*.png")],
+            initialfile=base + ("_graph.png" if graph else ".png"))
+        if not p:
+            return
+        if graph:
+            render_graph_png(fsm, p, self.st.title, fsm.summary())
+        else:
+            render_png(self.st, p)
+        messagebox.showinfo("저장 완료", "PNG로 저장했습니다.\n%s" % p)
+
+    def export_table(self):
+        """상태표를 글자 파일로 저장합니다."""
+        fsm, err = self.build_fsm()
+        if fsm is None:
+            messagebox.showerror("상태표를 만들 수 없습니다", err)
+            return
+        p = filedialog.asksaveasfilename(
+            defaultextension=".txt", filetypes=[("글자 파일", "*.txt")],
+            initialfile=(self.st.title or "timing").replace(" ", "_") + "_table.txt")
+        if not p:
+            return
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(fsm.table_text())
+        messagebox.showinfo("저장 완료", "상태표를 저장했습니다.\n%s" % p)
+
+    # ── 다시 그리기 ──
+    def redraw(self):
+        self._prep_tk_image()
+        self.canvas.delete("all")
+        draw_scene(TkBackend(self.canvas), self.st, tk_img=self.tk_img,
+                   preview=self.preview)
+        self.canvas.configure(scrollregion=(0, 0, self.st.total_w, self.st.total_h))
+        self.draw_tools()
+        if self.st.cursor is not None:
+            draw_cursor(TkBackend(self.canvas, "cursor"), self.st)
+        self.refresh_fsm()
+
+
+def render_png(st, path, scale=2):
+    im = Image.new("RGB", (int(st.total_w * scale), int(st.total_h * scale)), PAPER)
+    be = PilBackend(im, scale)
+    draw_scene(be, st, tk_img=None, with_cursor=False)
+    im.save(path)
+    return path
+
+
+if __name__ == "__main__":
+    App().mainloop()
