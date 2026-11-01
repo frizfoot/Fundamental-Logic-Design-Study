@@ -1,0 +1,4 @@
+# P10K 프로젝트 설정 (create_proj.tcl 이 자동으로 읽음)
+set fpga_part "xc7vx485tffg1157-1"
+set top_module "mas"
+set sim_top "buff3"

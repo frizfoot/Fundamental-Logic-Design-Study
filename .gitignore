@@ -1,0 +1,46 @@
+# 로컬 Vivado 프로젝트 작업 폴더 (2025.2 / 2026.1 버전 충돌 방지)
+**/vivado_proj/
+
+# Vivado 자동 생성 폴더 및 캐시 (구버전 프로젝트 폴더의 .srcs/.gen 포함)
+*.cache/
+*.hw/
+*.ip_user_files/
+*.runs/
+*.sim/
+*.srcs/
+*.gen/
+*.hbs/
+*.str/
+.Xil/
+# 구버전(루트 바로 아래) Vivado 폴더의 파형 설정 - 원본은 projects/<작업명>/sim/ 에 있음
+/*/*.wcfg
+
+# Vivado 프로젝트 및 로그/저널 파일
+*.xpr
+*.jou
+*.log
+*.pb
+*.wdb
+*.vcd
+*.bit
+*.bin
+*.ltx
+*.dcp
+*.rpt
+*.mif
+backup_*.jou
+backup_*.log
+
+# GitHub 토큰이 들어있는 로컬 설정 (절대 커밋 금지)
+git_auto_config.tcl
+
+# Python 캐시
+__pycache__/
+
+# OS 및 에디터 임시 파일
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Vivado 실행 시 작업 폴더에 생기는 파일
+dfx_runtime.txt
