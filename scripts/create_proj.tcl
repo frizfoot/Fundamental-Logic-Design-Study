@@ -25,6 +25,17 @@ if {[file exists [file join $work_dir project.tcl]]} {
 
 foreach d {src sim xdc} { file mkdir [file join $work_dir $d] }
 
+# 이 PC의 Vivado 에 해당 파트가 설치되어 있지 않으면 설치된 파트로 대체
+if {[llength [get_parts -quiet $fpga_part]] == 0} {
+    set fallback ""
+    foreach p {xc7k70tfbv676-1 xc7a35tcpg236-1 xc7vx485tffg1157-1} {
+        if {[llength [get_parts -quiet $p]] > 0} { set fallback $p; break }
+    }
+    if {$fallback eq ""} { set fallback [lindex [get_parts] 0] }
+    puts "WARNING: part $fpga_part is not installed on this PC -> using $fallback (project.tcl unchanged)"
+    set fpga_part $fallback
+}
+
 create_project -force $proj_name $proj_dir -part $fpga_part
 set_property target_language Verilog [current_project]
 
@@ -75,8 +86,8 @@ update_compile_order -fileset sources_1
 update_compile_order -fileset sim_1
 
 puts "=========================================================="
-puts " 로컬 Vivado 프로젝트 생성 완료: $proj_dir/$proj_name.xpr"
+puts " Local Vivado project created: $proj_dir/$proj_name.xpr"
 puts " Vivado [version -short] / part $fpga_part"
-puts " src, sim, xdc 안의 파일을 수정하면 그대로 Git 에 반영됩니다."
-puts " 새 소스 파일은 반드시 vivado_proj/ 밖의 src/ 또는 sim/ 에 만드세요."
+puts " Edits to files in src/ sim/ xdc/ go straight to Git."
+puts " Create NEW source files in src/ or sim/, NOT inside vivado_proj/."
 puts "=========================================================="
