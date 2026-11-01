@@ -14,32 +14,33 @@ source ../../scripts/create_proj.tcl
 
 | 프로젝트 | 한 줄 요약 | 포함 모듈 | 최근 업데이트 |
 | :--- | :--- | :--- | :--- |
-| [**13.11**](#1311) | - | `master` | 커밋 전 |
-| [**13.25**](#1325) | - | `dff`, `main` | 커밋 전 |
-| [**13.26**](#1326) | - | `jkff`, `main` | 커밋 전 |
-| [**13.262**](#13262) | - | `main` | 커밋 전 |
-| [**14.43a**](#1443a) | - | `master` | 커밋 전 |
-| [**14.44**](#1444) | - | `master` | 커밋 전 |
-| [**14.6**](#146) | - | `master` | 커밋 전 |
-| [**16.29**](#1629) | - | `main` | 커밋 전 |
-| [**counter_12prac**](#counter_12prac) | - | `counter`, `counter_tb` | 커밋 전 |
-| [**full adder**](#full-adder-full_adder) | - | `fullAdder` | 커밋 전 |
-| [**P10D**](#p10d) | - | `count`, `decod38` | 커밋 전 |
-| [**P10E**](#p10e) | - | `bcdconv`, `decod4to16`, `Master` | 커밋 전 |
-| [**P10I**](#p10i) | - | `master`, `mux21`, `pEnc` | 커밋 전 |
-| [**P10J**](#p10j) | - | `adder`, `adder2`, `mas` | 커밋 전 |
-| [**P10K**](#p10k) | - | `buff3`, `decod24`, `mas` | 커밋 전 |
-| [**P10K_desktop2**](#p10k_desktop2) | - | `buffer3`, `decod24`, `master` | 커밋 전 |
-| [**P10N**](#p10n) | - | `mEnc`, `pEnc` | 커밋 전 |
-| [**P1232**](#p1232) | - | `SRff`, `Ucount` | 커밋 전 |
-| [**practice_1**](#practice_1) | - | `ad2`, `ad42`, `wires`, `simple_gates` | 커밋 전 |
-| [**project_1**](#project_1) | - | `wires` | 커밋 전 |
-| [**project_1_desktop2**](#project_1_desktop2) | - | `F101`, `ANDP`, `CLKP`, `P10C`, `P1014`, `P1017`, `P10172`, `P1018`, `P10A`, `P10AR`, `P10C` | 커밋 전 |
-| [**project_2**](#project_2) | - | `P1010`, `P1011`, `P104`, `P10B` | 커밋 전 |
-| [**project_2_desktop2**](#project_2_desktop2) | - | `fulladder`, `P10C` | 커밋 전 |
-| [**project_3**](#project_3) | - | `bcdconv`, `decod4to16`, `Master` | 커밋 전 |
-| [**project_4**](#project_4) | - | `qw` | 커밋 전 |
-| [**thermostat**](#thermostat) | - | `thermostat` | 커밋 전 |
+| [**13.11**](#1311) | - | `master` | 2026-11-01 |
+| [**13.25**](#1325) | - | `dff`, `main` | 2026-11-01 |
+| [**13.26**](#1326) | - | `jkff`, `main` | 2026-11-01 |
+| [**13.262**](#13262) | - | `main` | 2026-11-01 |
+| [**14.43a**](#1443a) | - | `master` | 2026-11-01 |
+| [**14.44**](#1444) | - | `master` | 2026-11-01 |
+| [**14.6**](#146) | - | `master` | 2026-11-01 |
+| [**16.29**](#1629) | - | `main` | 2026-11-01 |
+| [**counter2421**](#counter2421) | - | `counter2421` | 커밋 전 |
+| [**counter_12prac**](#counter_12prac) | - | `counter`, `counter_tb` | 2026-11-01 |
+| [**full adder**](#full-adder-full_adder) | - | `fullAdder` | 2026-11-01 |
+| [**P10D**](#p10d) | - | `count`, `decod38` | 2026-11-01 |
+| [**P10E**](#p10e) | - | `bcdconv`, `decod4to16`, `Master` | 2026-11-01 |
+| [**P10I**](#p10i) | - | `master`, `mux21`, `pEnc` | 2026-11-01 |
+| [**P10J**](#p10j) | - | `adder`, `adder2`, `mas` | 2026-11-01 |
+| [**P10K**](#p10k) | - | `buff3`, `decod24`, `mas` | 2026-11-01 |
+| [**P10K_desktop2**](#p10k_desktop2) | - | `buffer3`, `decod24`, `master` | 2026-11-01 |
+| [**P10N**](#p10n) | - | `mEnc`, `pEnc` | 2026-11-01 |
+| [**P1232**](#p1232) | - | `SRff`, `Ucount` | 2026-11-01 |
+| [**practice_1**](#practice_1) | - | `ad2`, `ad42`, `wires`, `simple_gates` | 2026-11-01 |
+| [**project_1**](#project_1) | - | `wires` | 2026-11-01 |
+| [**project_1_desktop2**](#project_1_desktop2) | - | `F101`, `ANDP`, `CLKP`, `P10C`, `P1014`, `P1017`, `P10172`, `P1018`, `P10A`, `P10AR`, `P10C` | 2026-11-01 |
+| [**project_2**](#project_2) | - | `P1010`, `P1011`, `P104`, `P10B` | 2026-11-01 |
+| [**project_2_desktop2**](#project_2_desktop2) | - | `fulladder`, `P10C` | 2026-11-01 |
+| [**project_3**](#project_3) | - | `bcdconv`, `decod4to16`, `Master` | 2026-11-01 |
+| [**project_4**](#project_4) | - | `qw` | 2026-11-01 |
+| [**thermostat**](#thermostat) | - | `thermostat` | 2026-11-01 |
 
 ## 프로젝트별 상세 노트 및 모듈 명세
 
@@ -47,7 +48,7 @@ source ../../scripts/create_proj.tcl
 
 - **폴더**: [`projects/13.11`](projects/13.11) · [note.md](projects/13.11/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 - **시뮬레이션 파일**: `tb_1411.sv`
 
 #### 작업 노트
@@ -69,7 +70,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/13.25`](projects/13.25) · [note.md](projects/13.25/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 - **시뮬레이션 파일**: `sim1.sv`, `tb_13_25.sv`
 
 #### 작업 노트
@@ -93,7 +94,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/13.26`](projects/13.26) · [note.md](projects/13.26/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 - **시뮬레이션 파일**: `sim.sv`
 
 #### 작업 노트
@@ -121,7 +122,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/13.262`](projects/13.262) · [note.md](projects/13.262/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 - **시뮬레이션 파일**: `tb_13_26_2.sv`
 
 #### 작업 노트
@@ -145,7 +146,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/14.43a`](projects/14.43a) · [note.md](projects/14.43a/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 - **시뮬레이션 파일**: `tb_master_seq.sv`
 
 #### 작업 노트
@@ -167,7 +168,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/14.44`](projects/14.44) · [note.md](projects/14.44/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 
 #### 작업 노트
 
@@ -190,7 +191,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/14.6`](projects/14.6) · [note.md](projects/14.6/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 
 #### 작업 노트
 
@@ -208,7 +209,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/16.29`](projects/16.29) · [note.md](projects/16.29/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 - **시뮬레이션 파일**: `simul.sv`
 
 #### 작업 노트
@@ -232,11 +233,32 @@ _상세 노트 없음_
 
 </details>
 
+### counter2421
+
+- **폴더**: [`projects/counter2421`](projects/counter2421) · [note.md](projects/counter2421/note.md)
+- **요약**: -
+- **최근 업데이트**: 커밋 전
+- **시뮬레이션 파일**: `counter2421_tb.sv`
+
+#### 작업 노트
+
+_상세 노트 없음_
+
+<details><summary>RTL 모듈 및 포트 요약</summary>
+
+| 소스 파일 | 모듈명 | 방향 | 비트폭 | 포트명 |
+| :--- | :--- | :--- | :--- | :--- |
+| `counter2421.sv` | **`counter2421`** | `input` | `1` | `ClrN` |
+|  |  | `output` | `[3:0]` | `q` |
+|  |  | `input` | `1` | `clk` |
+
+</details>
+
 ### counter_12prac
 
 - **폴더**: [`projects/counter_12prac`](projects/counter_12prac) · [note.md](projects/counter_12prac/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 
 #### 작업 노트
 
@@ -257,7 +279,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/full_adder`](projects/full_adder) · [note.md](projects/full_adder/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 
 #### 작업 노트
 
@@ -279,7 +301,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/P10D`](projects/P10D) · [note.md](projects/P10D/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 
 #### 작업 노트
 
@@ -304,7 +326,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/P10E`](projects/P10E) · [note.md](projects/P10E/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 
 #### 작업 노트
 
@@ -326,7 +348,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/P10I`](projects/P10I) · [note.md](projects/P10I/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 - **시뮬레이션 파일**: `simul.sv`
 
 #### 작업 노트
@@ -357,7 +379,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/P10J`](projects/P10J) · [note.md](projects/P10J/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 - **시뮬레이션 파일**: `simul.sv`
 
 #### 작업 노트
@@ -389,7 +411,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/P10K`](projects/P10K) · [note.md](projects/P10K/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 
 #### 작업 노트
 
@@ -411,7 +433,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/P10K_desktop2`](projects/P10K_desktop2) · [note.md](projects/P10K_desktop2/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 - **시뮬레이션 파일**: `simul.sv`
 
 #### 작업 노트
@@ -440,7 +462,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/P10N`](projects/P10N) · [note.md](projects/P10N/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 - **시뮬레이션 파일**: `simul.sv`
 
 #### 작업 노트
@@ -472,7 +494,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/P1232`](projects/P1232) · [note.md](projects/P1232/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 
 #### 작업 노트
 
@@ -493,7 +515,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/practice_1`](projects/practice_1) · [note.md](projects/practice_1/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 - **시뮬레이션 파일**: `ad42_tb.sv`, `ad42_tbvcd.sv`, `simple_gates_tb.sv`
 
 #### 작업 노트
@@ -524,7 +546,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/project_1`](projects/project_1) · [note.md](projects/project_1/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 
 #### 작업 노트
 
@@ -542,7 +564,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/project_1_desktop2`](projects/project_1_desktop2) · [note.md](projects/project_1_desktop2/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 
 #### 작업 노트
 
@@ -609,7 +631,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/project_2`](projects/project_2) · [note.md](projects/project_2/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 - **시뮬레이션 파일**: `P1010s.sv`
 
 #### 작업 노트
@@ -643,7 +665,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/project_2_desktop2`](projects/project_2_desktop2) · [note.md](projects/project_2_desktop2/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 
 #### 작업 노트
 
@@ -669,7 +691,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/project_3`](projects/project_3) · [note.md](projects/project_3/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 
 #### 작업 노트
 
@@ -691,7 +713,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/project_4`](projects/project_4) · [note.md](projects/project_4/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 
 #### 작업 노트
 
@@ -710,7 +732,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/thermostat`](projects/thermostat) · [note.md](projects/thermostat/note.md)
 - **요약**: -
-- **최근 업데이트**: 커밋 전
+- **최근 업데이트**: 2026-11-01
 - **시뮬레이션 파일**: `thermostat.sv`
 
 #### 작업 노트
