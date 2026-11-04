@@ -33,6 +33,7 @@ source ../../scripts/create_proj.tcl
 | [**P10K_desktop2**](#p10k_desktop2) | - | `buffer3`, `decod24`, `master` | 2026-11-01 |
 | [**P10N**](#p10n) | - | `mEnc`, `pEnc` | 2026-11-01 |
 | [**P1232**](#p1232) | - | `SRff`, `Ucount` | 2026-11-01 |
+| [**P1234**](#p1234) | - | `ring_counter_jk` | 2026-11-05 |
 | [**practice_1**](#practice_1) | - | `ad2`, `ad42`, `wires`, `simple_gates` | 2026-11-01 |
 | [**project_1**](#project_1) | - | `wires` | 2026-11-01 |
 | [**project_1_desktop2**](#project_1_desktop2) | - | `F101`, `ANDP`, `CLKP`, `P10C`, `P1014`, `P1017`, `P10172`, `P1018`, `P10A`, `P10AR`, `P10C` | 2026-11-01 |
@@ -40,6 +41,7 @@ source ../../scripts/create_proj.tcl
 | [**project_2_desktop2**](#project_2_desktop2) | - | `fulladder`, `P10C` | 2026-11-01 |
 | [**project_3**](#project_3) | - | `bcdconv`, `decod4to16`, `Master` | 2026-11-01 |
 | [**project_4**](#project_4) | - | `qw` | 2026-11-01 |
+| [**ringcounter**](#ringcounter) | - | `flip`, `ring_counter_top` | 2026-11-05 |
 | [**thermostat**](#thermostat) | - | `thermostat` | 2026-11-01 |
 
 ## 프로젝트별 상세 노트 및 모듈 명세
@@ -511,6 +513,26 @@ _상세 노트 없음_
 
 </details>
 
+### P1234
+
+- **폴더**: [`projects/P1234`](projects/P1234) · [note.md](projects/P1234/note.md)
+- **요약**: -
+- **최근 업데이트**: 2026-11-05
+
+#### 작업 노트
+
+_상세 노트 없음_
+
+<details><summary>RTL 모듈 및 포트 요약</summary>
+
+| 소스 파일 | 모듈명 | 방향 | 비트폭 | 포트명 |
+| :--- | :--- | :--- | :--- | :--- |
+| `ringcounter.sv` | **`ring_counter_jk`** | `input` | `1` | `clk` |
+|  |  | `input` | `1` | `preset_n` |
+|  |  | `output` | `[7:0]` | `T` |
+
+</details>
+
 ### practice_1
 
 - **폴더**: [`projects/practice_1`](projects/practice_1) · [note.md](projects/practice_1/note.md)
@@ -725,6 +747,34 @@ _상세 노트 없음_
 | :--- | :--- | :--- | :--- | :--- |
 | `qw.sv` | **`qw`** | `input` | `1` | `a` |
 |  |  | `output` | `1` | `b` |
+
+</details>
+
+### ringcounter
+
+- **폴더**: [`projects/ringcounter`](projects/ringcounter) · [note.md](projects/ringcounter/note.md)
+- **요약**: -
+- **최근 업데이트**: 2026-11-05
+- **시뮬레이션 파일**: `ring_counter_top_tb.sv`
+
+#### 작업 노트
+
+_상세 노트 없음_
+
+<details><summary>RTL 모듈 및 포트 요약</summary>
+
+| 소스 파일 | 모듈명 | 방향 | 비트폭 | 포트명 |
+| :--- | :--- | :--- | :--- | :--- |
+| `flip.sv` | **`flip`** | `input` | `1` | `clk` |
+|  |  | `input` | `1` | `ce` |
+|  |  | `input` | `1` | `preset_n` |
+|  |  | `input` | `1` | `j` |
+|  |  | `input` | `1` | `init_val` |
+|  |  | `output` | `1` | `t` |
+| `ringcounter.sv` | **`ring_counter_top`** | `input` | `1` | `clk` |
+|  |  | `input` | `1` | `ce` |
+|  |  | `input` | `1` | `preset` |
+|  |  | `output` | `[7:0]` | `t` |
 
 </details>
 
