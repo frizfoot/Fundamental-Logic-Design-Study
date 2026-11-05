@@ -25,6 +25,7 @@ source ../../scripts/create_proj.tcl
 | [**counter2421**](#counter2421) | - | `counter2421` | 2026-11-01 |
 | [**counter_12prac**](#counter_12prac) | - | `counter`, `counter_tb` | 2026-11-01 |
 | [**full adder**](#full-adder-full_adder) | - | `fullAdder` | 2026-11-01 |
+| [**multiplier**](#multiplier) | - | `main` | 2026-11-06 |
 | [**P10D**](#p10d) | - | `count`, `decod38` | 2026-11-01 |
 | [**P10E**](#p10e) | - | `bcdconv`, `decod4to16`, `Master` | 2026-11-01 |
 | [**P10I**](#p10i) | - | `master`, `mux21`, `pEnc` | 2026-11-01 |
@@ -296,6 +297,30 @@ _상세 노트 없음_
 |  |  | `input` | `1` | `ci` |
 |  |  | `output` | `1` | `s` |
 |  |  | `output` | `1` | `co` |
+
+</details>
+
+### multiplier
+
+- **폴더**: [`projects/multiplier`](projects/multiplier) · [note.md](projects/multiplier/note.md)
+- **요약**: -
+- **최근 업데이트**: 2026-11-06
+
+#### 작업 노트
+
+_상세 노트 없음_
+
+<details><summary>RTL 모듈 및 포트 요약</summary>
+
+| 소스 파일 | 모듈명 | 방향 | 비트폭 | 포트명 |
+| :--- | :--- | :--- | :--- | :--- |
+| `main.sv` | **`main`** | `input` | `1` | `clk` |
+|  |  | `input` | `1` | `rst_n` |
+|  |  | `input` | `1` | `st` |
+|  |  | `input` | `[3:0]` | `ier` |
+|  |  | `input` | `[3:0]` | `cand` |
+|  |  | `output` | `[7:0]` | `prod` |
+|  |  | `output` | `1` | `done` |
 
 </details>
 
