@@ -27,13 +27,9 @@ proc git_pull_main {} {
     } else {
         puts "Changed files:"
         puts [git_run diff --stat $before $after]
-        # 이 PC에 아직 로컬 프로젝트가 없는 작업 폴더 안내
-        foreach d [glob -nocomplain -directory [file join $::GIT_ROOT projects] -types d *] {
-            if {![file exists [file join $d vivado_proj]]} {
-                puts "NOTE: [file tail $d] has no local project on this PC -> cd $d ; source ../../scripts/create_proj.tcl"
-            }
-        }
     }
+    # 이 PC에 로컬 프로젝트가 없는 작업 폴더는 자동 생성 (다른 PC에서 새로 올린 작업 포함)
+    git_create_missing_projects [glob -nocomplain -directory [file join $::GIT_ROOT projects] -types d *]
     git_sync_open_project
     git_banner "GitHub PULL done"
 }

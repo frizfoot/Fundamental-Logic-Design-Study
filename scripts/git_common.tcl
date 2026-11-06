@@ -43,6 +43,37 @@ proc git_has_rebase_in_progress {} {
     return 0
 }
 
+# 로컬 프로젝트(vivado_proj)가 없는 작업 폴더들을 별도 Vivado batch 프로세스로 생성
+# (지금 GUI 에 열려 있는 프로젝트는 건드리지 않음)
+proc git_create_missing_projects {dirs} {
+    set todo {}
+    foreach d $dirs {
+        if {[file isdirectory $d] && ![file exists [file join $d vivado_proj]]} { lappend todo [file normalize $d] }
+    }
+    if {[llength $todo] == 0} { return }
+
+    set vivado [file nativename [file join $::env(XILINX_VIVADO) bin vivado.bat]]
+    set list_tcl [file join $::env(TEMP) git_create_projects_[pid].tcl]
+    set fh [open $list_tcl w]
+    puts $fh "foreach d [list $todo] {"
+    puts $fh "    set ::create_proj_dir \$d"
+    puts $fh "    if {\[catch {source [list [file join $::GIT_ROOT scripts create_proj.tcl]]} e\]} { puts \"FAILED \$d : \$e\" }"
+    puts $fh "    catch {close_project}"
+    puts $fh "}"
+    close $fh
+
+    puts "Creating local Vivado project(s) for: [join [lmap d $todo {file tail $d}] {, }]  (please wait...)"
+    set old [pwd]
+    cd $::env(TEMP)
+    catch {exec cmd /c $vivado -mode batch -nojournal -nolog -source $list_tcl 2>@1} out
+    cd $old
+    file delete -force $list_tcl [file join $::env(TEMP) dfx_runtime.txt]
+    foreach line [split $out "\n"] {
+        if {[regexp {Local Vivado project created|WARNING: part|FAILED|^ERROR} $line]} { puts $line }
+    }
+    puts "Open them with File > Open Project > projects/<name>/vivado_proj/local_work.xpr"
+}
+
 # 열려 있는 프로젝트가 projects/<작업명>/vivado_proj 이면
 # src/ sim/ xdc/ 에 새로 생긴 파일은 추가하고, 사라진 파일은 프로젝트에서 제거
 proc git_sync_open_project {} {

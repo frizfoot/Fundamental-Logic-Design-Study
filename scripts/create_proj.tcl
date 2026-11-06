@@ -11,7 +11,14 @@
 # - unused/ 폴더는 무시됨 (프로젝트에서 빠져 있던 파일 보관용)
 # =============================================================
 
-set work_dir  [file normalize [pwd]]
+# 작업 폴더: 변수 create_proj_dir 또는 -tclargs <폴더> 로 지정 가능, 없으면 현재 폴더
+if {[info exists ::create_proj_dir] && $::create_proj_dir ne ""} {
+    set work_dir [file normalize $::create_proj_dir]
+} elseif {[info exists ::argv] && [llength $::argv] > 0 && [file isdirectory [lindex $::argv 0]]} {
+    set work_dir [file normalize [lindex $::argv 0]]
+} else {
+    set work_dir [file normalize [pwd]]
+}
 set proj_name "local_work"
 set proj_dir  [file join $work_dir vivado_proj]
 
