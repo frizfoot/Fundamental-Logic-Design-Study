@@ -25,7 +25,7 @@ source ../../scripts/create_proj.tcl
 | [**counter2421**](#counter2421) | - | `counter2421` | 2026-11-01 |
 | [**counter_12prac**](#counter_12prac) | - | `counter`, `counter_tb` | 2026-11-01 |
 | [**full adder**](#full-adder-full_adder) | - | `fullAdder` | 2026-11-01 |
-| [**multiplier**](#multiplier) | - | `main` | 2026-11-06 |
+| [**multiplier**](#multiplier) | - | `main` | 2026-11-08 |
 | [**P10D**](#p10d) | - | `count`, `decod38` | 2026-11-01 |
 | [**P10E**](#p10e) | - | `bcdconv`, `decod4to16`, `Master` | 2026-11-01 |
 | [**P10I**](#p10i) | - | `master`, `mux21`, `pEnc` | 2026-11-01 |
@@ -304,7 +304,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/multiplier`](projects/multiplier) · [note.md](projects/multiplier/note.md)
 - **요약**: -
-- **최근 업데이트**: 2026-11-06
+- **최근 업데이트**: 2026-11-08
 
 #### 작업 노트
 
