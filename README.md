@@ -305,6 +305,7 @@ _상세 노트 없음_
 - **폴더**: [`projects/multiplier`](projects/multiplier) · [note.md](projects/multiplier/note.md)
 - **요약**: -
 - **최근 업데이트**: 2026-11-08
+- **시뮬레이션 파일**: `simul.sv`
 
 #### 작업 노트
 
