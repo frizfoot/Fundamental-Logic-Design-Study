@@ -15,6 +15,10 @@ proc git_push_main {} {
     # 열려 있는 블록 디자인 저장 (있는 경우)
     catch {foreach bd [get_bd_designs -quiet] { save_bd_design $bd }}
 
+    # Vivado 가 vivado_proj 안(git 제외 폴더)에 만든 소스를 src/ sim/ xdc/ 로 이동
+    git_adopt_project_files
+    git_warn_hidden_sources
+
     # 1) 커밋
     git_run add -A
     lassign [git_try diff --cached --quiet] clean _
