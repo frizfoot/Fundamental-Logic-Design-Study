@@ -15,6 +15,10 @@ proc git_push_main {} {
     # 열려 있는 블록 디자인 저장 (있는 경우)
     catch {foreach bd [get_bd_designs -quiet] { save_bd_design $bd }}
 
+    # 동기화 안 되는 프로젝트(New Project 마법사로 만든 새 작업 등)가 열려 있으면
+    # 새 작업일 때 소스를 projects/<이름>/ 으로 복사 (경고는 맨 끝에 출력)
+    set ::git_unsynced [git_check_open_project 1]
+
     # Vivado 가 vivado_proj 안(git 제외 폴더)에 만든 소스를 src/ sim/ xdc/ 로 이동
     git_adopt_project_files
     git_warn_hidden_sources
@@ -54,4 +58,10 @@ proc git_push_main {} {
     git_banner "GitHub PUSH done"
 }
 
+set ::git_unsynced {}
 git_push_main
+# 동기화 안 되는 프로젝트가 열려 있었으면 맨 끝에 크게 경고 (새 작업이면 로컬 프로젝트도 생성)
+if {$::git_unsynced ne {}} {
+    git_create_missing_projects [list [dict get [lindex $::git_unsynced 0] work]]
+    git_warn_unsynced {*}$::git_unsynced
+}

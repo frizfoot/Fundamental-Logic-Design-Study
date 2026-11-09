@@ -35,3 +35,6 @@ proc git_pull_main {} {
 }
 
 git_pull_main
+# 동기화 안 되는 프로젝트가 열려 있으면 맨 끝에 크게 경고 (안 그러면 Pull 이 안 된 것처럼 보임)
+set git_unsynced [git_check_open_project 0]
+if {$git_unsynced ne {}} { git_warn_unsynced {*}$git_unsynced }

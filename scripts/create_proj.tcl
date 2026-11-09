@@ -19,7 +19,8 @@ if {[info exists ::create_proj_dir] && $::create_proj_dir ne ""} {
 } else {
     set work_dir [file normalize [pwd]]
 }
-set proj_name "local_work"
+# 프로젝트 이름 = 작업 폴더 이름 (Recent Projects 목록에서 local_work 끼리 헷갈리지 않도록)
+set proj_name [file tail $work_dir]
 set proj_dir  [file join $work_dir vivado_proj]
 
 # 기본값 (project.tcl 에서 덮어씀)
