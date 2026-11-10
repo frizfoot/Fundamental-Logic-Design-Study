@@ -24,6 +24,7 @@ source ../../scripts/create_proj.tcl
 | [**16.29**](#1629) | - | `main` | 2026-11-01 |
 | [**counter2421**](#counter2421) | - | `counter2421` | 2026-11-01 |
 | [**counter_12prac**](#counter_12prac) | - | `counter`, `counter_tb` | 2026-11-01 |
+| [**dice**](#dice) | - | `main` | 2026-11-10 |
 | [**full adder**](#full-adder-full_adder) | - | `fullAdder` | 2026-11-01 |
 | [**4-bit Shift-Add Multiplier (Roth & Kinney 18.2 / Fig. 19-10)**](#4-bit-shift-add-multiplier-roth--kinney-182--fig-19-10-multiplier) | - | `main` | 2026-11-08 |
 | [**P10D**](#p10d) | - | `count`, `decod38` | 2026-11-01 |
@@ -275,6 +276,29 @@ _상세 노트 없음_
 |  |  | `input` | `1` | `reset_n` |
 |  |  | `output` | `[2:0]` | `cba` |
 | `counter_tb.sv` | **`counter_tb`** | - | - | _포트 없음 (테스트벤치 등)_ |
+
+</details>
+
+### dice
+
+- **폴더**: [`projects/dice`](projects/dice) · [note.md](projects/dice/note.md)
+- **요약**: -
+- **최근 업데이트**: 2026-11-10
+
+#### 작업 노트
+
+_상세 노트 없음_
+
+<details><summary>RTL 모듈 및 포트 요약</summary>
+
+| 소스 파일 | 모듈명 | 방향 | 비트폭 | 포트명 |
+| :--- | :--- | :--- | :--- | :--- |
+| `main.sv` | **`main`** | `input` | `1` | `rb` |
+|  |  | `input` | `1` | `clk` |
+|  |  | `input` | `1` | `rst` |
+|  |  | `input` | `1` | `rst_n` |
+|  |  | `output` | `1` | `won` |
+|  |  | `output` | `1` | `lost` |
 
 </details>
 
