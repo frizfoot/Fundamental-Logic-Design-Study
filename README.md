@@ -24,7 +24,7 @@ source ../../scripts/create_proj.tcl
 | [**16.29**](#1629) | - | `main` | 2026-11-01 |
 | [**counter2421**](#counter2421) | - | `counter2421` | 2026-11-01 |
 | [**counter_12prac**](#counter_12prac) | - | `counter`, `counter_tb` | 2026-11-01 |
-| [**dice**](#dice) | - | `main` | 2026-11-11 |
+| [**dice**](#dice) | - | `main` | 2026-11-12 |
 | [**full adder**](#full-adder-full_adder) | - | `fullAdder` | 2026-11-01 |
 | [**4-bit Shift-Add Multiplier (Roth & Kinney 18.2 / Fig. 19-10)**](#4-bit-shift-add-multiplier-roth--kinney-182--fig-19-10-multiplier) | - | `main` | 2026-11-08 |
 | [**P10D**](#p10d) | - | `count`, `decod38` | 2026-11-01 |
@@ -283,7 +283,8 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/dice`](projects/dice) · [note.md](projects/dice/note.md)
 - **요약**: -
-- **최근 업데이트**: 2026-11-11
+- **최근 업데이트**: 2026-11-12
+- **시뮬레이션 파일**: `simul.sv`
 
 #### 작업 노트
 
