@@ -24,8 +24,8 @@ source ../../scripts/create_proj.tcl
 | [**16.29**](#1629) | - | `main` | 2026-11-01 |
 | [**counter2421**](#counter2421) | - | `counter2421` | 2026-11-01 |
 | [**counter_12prac**](#counter_12prac) | - | `counter`, `counter_tb` | 2026-11-01 |
-| [**dice**](#dice) | - | `main` | 2026-11-12 |
-| [**full adder**](#full-adder-full_adder) | - | `fullAdder` | 2026-11-01 |
+| [**dice**](#dice) | - | `main` | 2026-11-13 |
+| [**full adder**](#full-adder-full_adder) | - | `fullAdder` | 2026-11-12 |
 | [**4-bit Shift-Add Multiplier (Roth & Kinney 18.2 / Fig. 19-10)**](#4-bit-shift-add-multiplier-roth--kinney-182--fig-19-10-multiplier) | - | `main` | 2026-11-08 |
 | [**P10D**](#p10d) | - | `count`, `decod38` | 2026-11-01 |
 | [**P10E**](#p10e) | - | `bcdconv`, `decod4to16`, `Master` | 2026-11-01 |
@@ -283,7 +283,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/dice`](projects/dice) · [note.md](projects/dice/note.md)
 - **요약**: -
-- **최근 업데이트**: 2026-11-12
+- **최근 업데이트**: 2026-11-13
 - **시뮬레이션 파일**: `simul.sv`
 
 #### 작업 노트
@@ -481,6 +481,20 @@ Claude F/B:
 
 1~5번만 고쳐도 동작할 거야. 고치면 TB 짜기 전에 다시 보여 줘.
 
+위의 코드 버그 수정점 정리
+
+버그	교훈
+## 디버깅 정리
+
+| 버그 | 교훈 |
+|---|---|
+| `else` 뒤 두 줄 | 두 줄 이상은 무조건 `begin`/`end` |
+| `sum==7\|11` | `\|\|` 양쪽은 각각 완전한 비교식 |
+| 두 카운터 동시 증가 | 앞 카운터가 한 바퀴 돌면 다음 카운터가 한 칸 (시계 원리) |
+| `point`가 사라짐 | 기억할 값은 `always_ff`, 컨트롤러는 명령 신호(`lp`)만 |
+| `lp` 기본값 없음 | `always_comb`의 모든 출력에 기본값 (래치 방지) |
+| `sum`이 FF | 바로 계산되는 값은 `assign` |
+
 <details><summary>RTL 모듈 및 포트 요약</summary>
 
 | 소스 파일 | 모듈명 | 방향 | 비트폭 | 포트명 |
@@ -498,11 +512,26 @@ Claude F/B:
 
 - **폴더**: [`projects/full_adder`](projects/full_adder) · [note.md](projects/full_adder/note.md)
 - **요약**: -
-- **최근 업데이트**: 2026-11-01
+- **최근 업데이트**: 2026-11-12
 
 #### 작업 노트
 
-_상세 노트 없음_
+### 작업 내용 및 핵심 설계
+- Simple full adder using sum and Carry Out
+
+### 테스트 / 트러블슈팅 메모
+- 
+module fullAdder(
+    input a,
+    input b,
+    input ci,
+    output s,
+    output co
+    );
+    
+    assign s=a^b^ci;
+    assign co =a&b|b&ci|ci&a;
+endmodule
 
 <details><summary>RTL 모듈 및 포트 요약</summary>
 
