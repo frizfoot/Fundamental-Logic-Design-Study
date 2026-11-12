@@ -23,7 +23,9 @@
 module main(
     input logic rb,clk,
     input logic rst,rst_n,//rst is reset input button while rst_n is total reset no matter what
-    output logic won, lost
+    output logic won, lost,
+    output logic [3:0]display1,
+    output logic [3:0]display2
     );
     //6 states
     typedef enum logic [2:0]{
@@ -47,15 +49,16 @@ module main(
         logic [2:0]counter2;
         logic [3:0]sum;
         logic roll;
+        logic lp;
         logic [3:0]point;
-        logic [3:0]display1;
-        logic [3:0]display2;
         
         //fsm sm chart to SV
         always_comb begin
             next=current;
             roll=1'b0;//set default it is a signal that enables counter to roll
-            point=3'b0000;
+            won=1'b0;
+            lost=1'b0;
+            lp=1'b0;
             
             case(current)
                 standby1: begin //s0
@@ -69,17 +72,21 @@ module main(
                         roll=1'b1; //use roll to roll counter
                     end
                     
-                    else if (!rb)
+                    else if (!rb) begin
                         roll=1'b0;
-                        if (sum==7|11) begin
+                        if (sum==7||sum==11) begin // for or, you need to use ||
                             next=win;
+                            
                         end
-                        else if (sum==2|3|12) begin 
+                        else if (sum==2||sum==3||sum==12) begin 
                             next=lose;
+                            
                         end
-                        else
-                            point=sum; //point is saved by sum
+                        else begin
+                            lp=1'b1; //point is saved by sum
                             next=standby2;
+                        end
+                    end
                 end
                 
                 standby2: begin //s3
@@ -93,31 +100,51 @@ module main(
                         roll=1'b1;//use roll to roll counter
                     end
                     
-                    else if (!rb)
+                    else if (!rb) begin
                         roll=1'b0;
                         if (sum==point) begin//check if the sum is equal topoint that is saved
                             next=win;
+                            
                         end
                         else if (sum==7) begin
                             next=lose;
+                            
                         end
                         else
-                            next=standby2;                        
+                            next=standby2;
+                    end                        
                 end
                
                 win: begin //s2
-                    if(!rst) next=win;
-                    else next=standby1;
+                    
+                    if(!rst) begin
+                        next=win;
+                        won=1'b1;
+                    end
+                    else begin
+                        next=standby1;
+                        won=1'b0;
+                    end
                 end
                 lose: begin //s2
-                    if(!rst) next=lose;
-                    else next=standby1;
+                    
+                    if(!rst) begin 
+                        next=lose;
+                        lost=1'b1;
+                    end
+                    else begin 
+                        next=standby1;
+                        lost=1'b0;
+                    end
+                end
+                default: begin        // 110, 111 states that are not used
+                    next=standby1;    // reset
                 end
             endcase
         end
         
 
-        //Dice counter
+        //Dice counter module
         always_ff@(posedge clk or negedge rst_n) begin
             if(!rst_n)begin
                 counter1<=3'd1;
@@ -126,27 +153,28 @@ module main(
             else if(roll==1) begin
                 if(counter1==3'd6) begin
                     counter1<=3'd1;
+                    if(counter2==3'd6) begin
+                        counter2<=3'd1;
+                    end
+                    else counter2<=counter2+3'd1;
                 end
                 else counter1<=counter1+3'd1;
-                
-                if(counter2==3'd6) begin
-                    counter2<=3'd1;
-                end
-                else counter2<=counter2+3'd1;
-            end
-            
-            else if (!roll) begin
-                display1=counter1;
-                display2=counter2;
+                  
             end
         end
-        
-        always_ff@(negedge clk or negedge rst_n) begin// I did negedge clk because counter1 and 2 values are set at posedge which mean at the next negedge will give proper counter1,2 values
-            if (!rst_n) begin
-                sum<=3'd0;
-            end
-            else if (!roll) 
-                sum=counter1+counter2;
-            end  
+        assign display1=counter1;
+        assign display2=counter2;
+        //sum does not us ff because it has to be assigned immediately when counter numbers are in
+        assign sum=counter1+counter2;    
+            
+        //point ff module
+        always_ff@(posedge clk or negedge rst_n) begin
+            if(!rst_n)
+                point<=4'b0;
+            else if (lp)//load point
+                point<=sum;
+        end
         
 endmodule
+
+
