@@ -24,7 +24,7 @@ source ../../scripts/create_proj.tcl
 | [**16.29**](#1629) | - | `main` | 2026-11-01 |
 | [**counter2421**](#counter2421) | - | `counter2421` | 2026-11-01 |
 | [**counter_12prac**](#counter_12prac) | - | `counter`, `counter_tb` | 2026-11-01 |
-| [**dice**](#dice) | - | `main` | 2026-11-12 |
+| [**dice**](#dice) | - | `main` | 2026-11-13 |
 | [**full adder**](#full-adder-full_adder) | - | `fullAdder` | 2026-11-12 |
 | [**4-bit Shift-Add Multiplier (Roth & Kinney 18.2 / Fig. 19-10)**](#4-bit-shift-add-multiplier-roth--kinney-182--fig-19-10-multiplier) | - | `main` | 2026-11-08 |
 | [**P10D**](#p10d) | - | `count`, `decod38` | 2026-11-01 |
@@ -283,7 +283,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/dice`](projects/dice) · [note.md](projects/dice/note.md)
 - **요약**: -
-- **최근 업데이트**: 2026-11-12
+- **최근 업데이트**: 2026-11-13
 - **시뮬레이션 파일**: `simul.sv`
 
 #### 작업 노트
@@ -480,6 +480,16 @@ Claude F/B:
 - 주석 상태 번호가 틀렸어 (lose가 //s2).
 
 1~5번만 고쳐도 동작할 거야. 고치면 TB 짜기 전에 다시 보여 줘.
+
+위의 코드 버그 수정점 정리
+
+버그	교훈
+else 뒤 두 줄	두 줄 이상은 무조건 begin/end
+sum==7|11	|| 양쪽은 각각 완전한 비교식
+두 카운터 동시 증가	앞 카운터가 한 바퀴 돌면 다음 카운터가 한 칸 (시계 원리)
+point가 사라짐	기억할 값은 always_ff, 컨트롤러는 명령 신호(lp)만
+lp 기본값 없음	always_comb의 모든 출력에 기본값 (래치 방지)
+sum이 FF	바로 계산되는 값은 assign
 
 <details><summary>RTL 모듈 및 포트 요약</summary>
 
