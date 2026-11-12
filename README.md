@@ -505,6 +505,8 @@ Claude F/B:
 |  |  | `input` | `1` | `rst_n` |
 |  |  | `output` | `1` | `won` |
 |  |  | `output` | `1` | `lost` |
+|  |  | `output` | `[3:0]` | `display1` |
+|  |  | `output` | `[3:0]` | `display2` |
 
 </details>
 
