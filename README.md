@@ -25,7 +25,7 @@ source ../../scripts/create_proj.tcl
 | [**counter2421**](#counter2421) | - | `counter2421` | 2026-11-01 |
 | [**counter_12prac**](#counter_12prac) | - | `counter`, `counter_tb` | 2026-11-01 |
 | [**dice**](#dice) | - | `main` | 2026-11-12 |
-| [**full adder**](#full-adder-full_adder) | - | `fullAdder` | 2026-11-01 |
+| [**full adder**](#full-adder-full_adder) | - | `fullAdder` | 2026-11-12 |
 | [**4-bit Shift-Add Multiplier (Roth & Kinney 18.2 / Fig. 19-10)**](#4-bit-shift-add-multiplier-roth--kinney-182--fig-19-10-multiplier) | - | `main` | 2026-11-08 |
 | [**P10D**](#p10d) | - | `count`, `decod38` | 2026-11-01 |
 | [**P10E**](#p10e) | - | `bcdconv`, `decod4to16`, `Master` | 2026-11-01 |
@@ -498,11 +498,26 @@ Claude F/B:
 
 - **폴더**: [`projects/full_adder`](projects/full_adder) · [note.md](projects/full_adder/note.md)
 - **요약**: -
-- **최근 업데이트**: 2026-11-01
+- **최근 업데이트**: 2026-11-12
 
 #### 작업 노트
 
-_상세 노트 없음_
+### 작업 내용 및 핵심 설계
+- Simple full adder using sum and Carry Out
+
+### 테스트 / 트러블슈팅 메모
+- 
+module fullAdder(
+    input a,
+    input b,
+    input ci,
+    output s,
+    output co
+    );
+    
+    assign s=a^b^ci;
+    assign co =a&b|b&ci|ci&a;
+endmodule
 
 <details><summary>RTL 모듈 및 포트 요약</summary>
 
