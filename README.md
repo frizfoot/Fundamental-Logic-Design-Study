@@ -484,35 +484,16 @@ Claude F/B:
 위의 코드 버그 수정점 정리
 
 버그	교훈
-\documentclass{article}
-\usepackage{kotex}      % 한글
-\usepackage{tabularx}   % 칸 너비 자동 줄바꿈
-\usepackage{booktabs}   % 깔끔한 가로줄
+## 디버깅 정리
 
-\begin{document}
-
-\section*{주사위 게임 컨트롤러 디버깅 정리}
-
-\begin{tabularx}{\textwidth}{l X}
-\toprule
-\textbf{버그} & \textbf{교훈} \\
-\midrule
-\texttt{else} 뒤 두 줄
-  & 두 줄 이상은 무조건 \texttt{begin}/\texttt{end} \\
-\texttt{sum==7|11}
-  & \texttt{||} 양쪽은 각각 완전한 비교식 \\
-두 카운터 동시 증가
-  & 앞 카운터가 한 바퀴 돌면 다음 카운터가 한 칸 (시계 원리) \\
-\texttt{point}가 사라짐
-  & 기억할 값은 \texttt{always\_ff}, 컨트롤러는 명령 신호(\texttt{lp})만 \\
-\texttt{lp} 기본값 없음
-  & \texttt{always\_comb}의 모든 출력에 기본값 (래치 방지) \\
-\texttt{sum}이 FF
-  & 바로 계산되는 값은 \texttt{assign} \\
-\bottomrule
-\end{tabularx}
-
-\end{document}
+| 버그 | 교훈 |
+|---|---|
+| `else` 뒤 두 줄 | 두 줄 이상은 무조건 `begin`/`end` |
+| `sum==7\|11` | `\|\|` 양쪽은 각각 완전한 비교식 |
+| 두 카운터 동시 증가 | 앞 카운터가 한 바퀴 돌면 다음 카운터가 한 칸 (시계 원리) |
+| `point`가 사라짐 | 기억할 값은 `always_ff`, 컨트롤러는 명령 신호(`lp`)만 |
+| `lp` 기본값 없음 | `always_comb`의 모든 출력에 기본값 (래치 방지) |
+| `sum`이 FF | 바로 계산되는 값은 `assign` |
 
 <details><summary>RTL 모듈 및 포트 요약</summary>
 
