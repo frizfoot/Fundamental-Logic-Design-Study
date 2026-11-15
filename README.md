@@ -44,7 +44,7 @@ source ../../scripts/create_proj.tcl
 | [**project_3**](#project_3) | - | `bcdconv`, `decod4to16`, `Master` | 2026-11-01 |
 | [**project_4**](#project_4) | - | `qw` | 2026-11-01 |
 | [**ringcounter**](#ringcounter) | - | `flip`, `ring_counter_top` | 2026-11-05 |
-| [**SDRAM_256Mb**](#sdram_256mb) | - | - | 2026-11-15 |
+| [**SDRAM_256Mb**](#sdram_256mb) | - | - | 2026-11-16 |
 | [**thermostat**](#thermostat) | - | `thermostat` | 2026-11-01 |
 
 ## 프로젝트별 상세 노트 및 모듈 명세
@@ -1109,7 +1109,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/SDRAM_256Mb`](projects/SDRAM_256Mb) · [note.md](projects/SDRAM_256Mb/note.md)
 - **요약**: -
-- **최근 업데이트**: 2026-11-15
+- **최근 업데이트**: 2026-11-16
 
 #### 작업 노트
 
@@ -1130,22 +1130,34 @@ BURST: READ WRITE 한번에 연속된 컬럼 여러 개를 자동으로 주고 �
 -> BL 크기의 블록으로 시작 컬럼이 속한 블록 안에서 신호가 돎
 
 **동작 명령**
+
 시퀀스: IDLE → (요청 옴) → ACT 보내기 → tRCD 기다리기 → READ 또는 WRITE → ... → PRE → IDLE
+
 ACT (뱅크 + 로우 주소)   → 로우 하나 열기: 8192비트가 센스앰프에 올라옴
+
 READ (뱅크 + 컬럼 주소)  → 그중 컬럼 1개 = 16비트 선택
+
 CL 클럭 뒤               → DQ0~DQ15로 16비트 출력
 
 ACT(Active): Row를 열어 읽을 준비-> 다음에 Read/Write가 나옴
+
 ->Capacitor의 전하가 Bitline으로 들어가며 원래 값이 깨짐->Sense Amplifier가 다시 Cell에 Data Restore 시켜줌(tRAs가 이게 걸리는 시간)
+
 -> ACT가 Row를 열면, 512(Column 갯수) X 16Bit = 8192 비트(Page) 를 Sense Amplifier가 다 읽음->이 중 16 비트만 DQ로 보냄
 
 READ:데이터를 읽음
+
 WRITE: 데이터를 씀
+
 PRE: 페이지를 닫는다
+
 REF(Refresh): 64ms에 한번씩 ACT->PRE로 Capcitor 전류 Reset (Cell Cap이 클수록(누설이 잘 버팀), Bit Line Parasite Cap이 작을수록(Sensing이 잘됨), Sense Amp 쉬움)
+
 MRS: Presetting
+
 (Mode Register Set):  어떻게 동작할지 적어두는 설정 칸, 전원 ON 순간 Controller가 Write
 -> Example: 새 핸드폰 킬 때 시계 언어 설정.
+
 NOP: No Operation (Default 값)
 
 **Pin**
