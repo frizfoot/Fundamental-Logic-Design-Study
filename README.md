@@ -44,6 +44,7 @@ source ../../scripts/create_proj.tcl
 | [**project_3**](#project_3) | - | `bcdconv`, `decod4to16`, `Master` | 2026-11-01 |
 | [**project_4**](#project_4) | - | `qw` | 2026-11-01 |
 | [**ringcounter**](#ringcounter) | - | `flip`, `ring_counter_top` | 2026-11-05 |
+| [**SDRAM_256Mb**](#sdram_256mb) | - | - | 2026-11-15 |
 | [**thermostat**](#thermostat) | - | `thermostat` | 2026-11-01 |
 
 ## 프로젝트별 상세 노트 및 모듈 명세
@@ -1103,6 +1104,16 @@ _상세 노트 없음_
 |  |  | `output` | `[7:0]` | `t` |
 
 </details>
+
+### SDRAM_256Mb
+
+- **폴더**: [`projects/SDRAM_256Mb`](projects/SDRAM_256Mb) · [note.md](projects/SDRAM_256Mb/note.md)
+- **요약**: -
+- **최근 업데이트**: 2026-11-15
+
+#### 작업 노트
+
+_상세 노트 없음_
 
 ### thermostat
 
