@@ -1166,6 +1166,7 @@ RAS(Row Address Strobe): 현재 Address Pin에 Row 주소가 있다고 Notice
   ->Burst Type (Sequential, Interleave)
 - LQDM, UDQM Masking->데이터 무시
 - Auto Refresh 64ms
+<img width="2346" height="1568" alt="image" src="https://github.com/user-attachments/assets/224a0fc6-ccca-42f7-a819-07702d8c0686" />
 
 ### 작업 내용 및 핵심 설계
 - 
