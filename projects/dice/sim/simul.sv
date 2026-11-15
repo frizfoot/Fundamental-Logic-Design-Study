@@ -22,7 +22,8 @@
 
 module simul;
     logic rb,clk,rst_n,rst;
-    logic won,lost,display1,display2;
+    logic won,lost;
+    logic [3:0] display1,display2;
     
     main dut(.*);
     int errors=0;
