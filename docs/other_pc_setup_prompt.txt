@@ -1,0 +1,107 @@
+=====================================================================
+ 다른 PC 세팅용 프롬프트
+ 사용법: 다른 PC의 Claude Code에 아래 "----- 여기부터 -----" ~ "----- 여기까지 -----"
+         사이를 통째로 복사해서 붙여 넣기
+=====================================================================
+
+----- 여기부터 -----
+[다른 PC에서 진행하던 작업 이어서 하기 — 이 PC도 똑같이 세팅]
+
+나는 GitHub 저장소 frizfoot/Fundamental-Logic-Design-Study 에서 디지털 논리 설계를 공부하고 있어.
+다른 PC(M-Frizfoot)에서 세팅을 다 끝냈고, 이 PC도 똑같이 만들어서 두 PC를 번갈아 쓰려고 해.
+아래 내용을 기억하고, 세팅을 단계별로 진행해 줘. 네가 직접 실행할 수 있는 건 실행하고 확인까지 해 주고,
+내가 직접 해야 하는 것(웹사이트 로그인, 설치 프로그램 클릭, 재부팅 등)은 무엇을 눌러야 하는지 알려 줘.
+대화는 한국어로 해 줘.
+
+## 1. 프로젝트 결정 사항 (이미 확정됨, 다시 논의하지 말 것)
+- SDR SDRAM 컨트롤러를 RTL부터 전부 내가 직접 작성한다.
+  너는 코드를 대신 짜 주지 말고, 틀과 질문을 주고 내가 만든 것을 설계 리뷰처럼 검토해 줘
+  (빠진 부분과 엣지 케이스 지적 위주).
+- 보드: DE10-Lite (Intel/Altera MAX 10, 10M50DAF484C7G)
+  탑재 SDRAM: IS42S16320D = 512Mb (4 bank x 8192 row x 1024 column x 16bit
+  -> row 13비트, column 10비트, bank 2비트, 워드 주소 25비트)
+  저장소 폴더 이름 projects/SDRAM_256Mb 는 보드를 정하기 전의 이름이다 (바꾸지 않음).
+- 현업식 개발 방식:
+  1) 설계: 코드 전에 마이크로아키텍처 스펙 문서 (포트, 상태도, 타이밍 표)
+  2) 코딩: active-low 는 _n (예: rst_n), 타이밍 값은 전부 parameter, 래치 금지, Verilator lint
+  3) 검증: SDRAM 모델 + SVA assertion 으로 tRCD/tRP 위반 자동 검출,
+     랜덤 주소/데이터 + reference model scoreboard (주사위 프로젝트 때 배운 방식)
+  4) 시뮬레이터: Questa Altera FPGA Starter (무료)
+  5) 타이밍: Quartus Timing Analyzer + SDC
+  6) 보드 디버깅: SignalTap
+  7) 형상 관리: GitHub, 기능별 커밋 + README
+- 새로 배울 것: SVA, STA/SDC, SignalTap -> 해당 단계가 오면 하나씩 설명해 줘.
+- OpenLane 레이아웃은 2027년 1월로 미룸.
+
+## 2. 이 PC 세팅 순서 (다른 PC에서는 전부 완료 / 테스트 통과)
+
+### 2-1. 저장소 받기
+- Git for Windows 설치 확인 (git --version)
+- 저장소가 없으면: git clone https://github.com/frizfoot/Fundamental-Logic-Design-Study.git
+  있으면: 저장소 폴더에서 git pull
+- 다른 PC 경로는 C:\Users\noelk\Vivado 였다. 이 PC의 실제 경로를 먼저 확인해 줘.
+- git pull 후 scripts/QUARTUS_QUESTA.md 와 docs/manual.txt 를 읽고 그 구성대로 맞춰 줘.
+
+### 2-2. Quartus Prime Lite 설치
+- 다른 PC와 같은 버전: Quartus Prime Lite 25.1std (설치 경로 C:\altera_lite\25.1std)
+  -> 두 PC 버전이 같아야 커밋된 .qsf 가 문제없이 열린다. 버전이 다르면 알려 줘.
+- 설치 시 포함할 것: Quartus Prime Lite, MAX 10 FPGA 디바이스 지원,
+  Questa - Altera FPGA Starter Edition
+- 설치 후 QUARTUS_ROOTDIR 환경 변수와 quartus_sh.exe, questa_fse\win64\vsim.exe 존재 확인
+
+### 2-3. Questa 무료 라이선스 (이 PC 전용으로 새로 받아야 함)
+- 라이선스는 PC의 MAC 주소에 묶인다. 다른 PC의 라이선스 파일은 여기서 안 된다.
+- 1) 이 PC의 MAC 주소 확인: Get-NetAdapter -Physical
+     메인보드 내장 유선 랜 / 내장 Wi-Fi 를 사용. USB 랜카드, VPN, 도킹 스테이션은 피할 것.
+- 2) Altera Self-Service Licensing Center (SSLC) 로그인 (다른 PC와 같은 계정)
+     -> Sign up for Evaluation or Free Licenses
+     -> Questa* Altera FPGA Starter Edition (SW-QUESTA), 좌석 1, Get License
+     -> Computer Name: 이 PC 이름 / License Type: FIXED / Computer Type: NIC ID /
+        Primary Computer ID: MAC 주소 (하이픈 없이 12자리)
+- 3) 이메일로 온 LR-xxxxxx_License.dat 를 C:\altera_lite\license\license.dat 로 저장
+     (파일 안의 HOSTID 가 이 PC MAC 과 같은지 확인해 줘)
+- 4) 사용자 환경 변수 두 개 (둘 다):
+     SALT_LICENSE_SERVER = C:\altera_lite\license\license.dat
+     SALT_LICENSE_FILE   = C:\altera_lite\license\license.dat
+- 5) Quartus/Questa 완전히 껐다 켜기
+- 6) 테스트: 작은 SV 모듈을 vlog/vsim -c 로 돌려서 에러 없이 끝나는지 확인
+- 주의: 무료 라이선스는 한 PC에서 동시에 Questa 1개만 실행 가능.
+  "only one session is allowed" 에러가 나면 열려 있는 Questa 창을 닫을 것.
+
+### 2-4. Quartus / Questa <-> GitHub 연동 확인 (스크립트는 저장소에 이미 있음)
+- scripts/quartus_proj.tcl : projects/<작업명>/quartus/<작업명>.qpf/.qsf 생성·동기화
+  (.qpf/.qsf 는 커밋됨, 경로는 상대경로 ../src/... 라서 PC 상관없이 열림)
+- scripts/questa_sim.do    : src/ + sim/ 컴파일 후 project.tcl 의 sim_top 실행
+- scripts/q_git_push.tcl / q_git_pull.tcl : Quartus(Tools > Tcl Scripts) 또는 Questa Transcript 에서 실행
+- 확인할 것:
+  1) quartus_sh -t scripts/q_git_pull.tcl 실행 -> 에러 없이 "GitHub PULL done"
+  2) projects/SDRAM_256Mb/quartus/SDRAM_256Mb.qpf 가 Quartus 에서 열리는지
+  3) Questa 에서 source <저장소>/scripts/q_git_push.tcl -> "GitHub PUSH done"
+     (처음이면 GitHub 로그인 창이 뜰 수 있음)
+
+### 2-5. Ubuntu (WSL2) + Verilator  (지금은 선택, OpenLane 하는 1월에는 필수)
+- 관리자 PowerShell: wsl --install -d Ubuntu -> 필요하면 재부팅 -> Ubuntu 사용자/비밀번호 만들기
+- wsl -l -v 로 Ubuntu 가 VERSION 2 인지 확인
+- Ubuntu 터미널:
+    cd /mnt/c/Users/<윈도우사용자>/<저장소경로>
+    ln -s /mnt/c/Users/<윈도우사용자>/<저장소경로> ~/vivado
+    sudo apt update && sudo apt install -y verilator git
+    verilator --version
+    git config --global core.autocrlf input
+
+## 3. 현재 진행 상황 / 다음 할 일
+- 스펙 문서 1장 작성 중: projects/SDRAM_256Mb/doc/spec.md (다른 PC에서 push 했으면 pull 로 받음)
+  1) 포트 목록 표 (name | direction | width | meaning)
+     - SDRAM 쪽: DRAM_CLK, DRAM_CKE, DRAM_CS_N, DRAM_RAS_N, DRAM_CAS_N, DRAM_WE_N,
+       DRAM_BA[1:0], DRAM_ADDR[12:0], DRAM_LDQM, DRAM_UDQM, DRAM_DQ[15:0]
+     - 호스트 쪽: 내가 설계
+  2) 호스트 규칙 (내가 답할 질문)
+     - ready 는 언제 1인가? 리프레시 중에 req 가 오면?
+     - 요청 수락 조건 (예: req && ready 인 클럭 엣지), 수락 후 addr/we/wdata 유지 필요 여부
+     - rvalid 는 언제, 몇 사이클 1인가?
+     - addr 폭 (워드 25비트 / 바이트), 데이터 폭 (16비트 / 더 넓게)
+     - 클럭 (보드 50 MHz, PLL 여부), rst_n 동기/비동기
+  3) 그다음: 메인 FSM SM 차트 (초기화 / 대기 / 읽기·쓰기 / 리프레시)
+
+세팅 2-1 부터 하나씩 진행해 주고, 끝나면 3번 작업(내가 쓴 포트 표와 호스트 규칙 리뷰)으로 넘어가자.
+----- 여기까지 -----
