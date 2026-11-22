@@ -44,7 +44,7 @@ source ../../scripts/create_proj.tcl
 | [**project_3**](#project_3) | - | `bcdconv`, `decod4to16`, `Master` | 2026-11-01 |
 | [**project_4**](#project_4) | - | `qw` | 2026-11-01 |
 | [**ringcounter**](#ringcounter) | - | `flip`, `ring_counter_top` | 2026-11-05 |
-| [**SDRAM_256Mb**](#sdram_256mb) | Samsung K4S561632E (256Mb SDR SDRAM, x16) 데이터시트 정리 및 SDR SDRAM 컨트롤러 설계 노트 | - | 2026-11-16 |
+| [**SDRAM_256Mb**](#sdram_256mb) | Samsung K4S561632E (256Mb SDR SDRAM, x16) 데이터시트 정리 및 SDR SDRAM 컨트롤러 설계 노트 | - | 2026-11-23 |
 | [**thermostat**](#thermostat) | - | `thermostat` | 2026-11-01 |
 
 ## 프로젝트별 상세 노트 및 모듈 명세
@@ -1109,7 +1109,7 @@ _상세 노트 없음_
 
 - **폴더**: [`projects/SDRAM_256Mb`](projects/SDRAM_256Mb) · [note.md](projects/SDRAM_256Mb/note.md)
 - **요약**: Samsung K4S561632E (256Mb SDR SDRAM, x16) 데이터시트 정리 및 SDR SDRAM 컨트롤러 설계 노트
-- **최근 업데이트**: 2026-11-16
+- **최근 업데이트**: 2026-11-23
 
 #### 작업 노트
 
